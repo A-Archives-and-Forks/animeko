@@ -534,7 +534,7 @@ private fun EpisodeScreenTabletVeryWide(
                                 onSetDanmakuSourceEnabled = { providerId, enabled ->
                                     vm.setDanmakuSourceEnabled(providerId, enabled)
                                 },
-                                onClickLogin = { navigator.navigateBangumiAuthorize() },
+                                onClickLogin = { navigator.navigateLogin() },
                                 onClickTag = { navigator.navigateSubjectSearch(it.name) },
                                 onManualMatchDanmaku = {
                                     vm.startMatchingDanmaku(it)
@@ -669,7 +669,7 @@ private fun EpisodeScreenContentPhone(
                 onSetDanmakuSourceEnabled = { providerId, enabled ->
                     vm.setDanmakuSourceEnabled(providerId, enabled)
                 },
-                onClickLogin = { navigator.navigateBangumiAuthorize() },
+                onClickLogin = { navigator.navigateLogin() },
                 onClickTag = { navigator.navigateSubjectSearch(it.name) },
                 onManualMatchDanmaku = {
                     vm.startMatchingDanmaku(it)
