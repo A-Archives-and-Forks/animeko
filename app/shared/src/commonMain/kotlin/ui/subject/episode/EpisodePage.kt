@@ -525,7 +525,7 @@ private fun EpisodeScreenTabletVeryWide(
                                 vm.editableSubjectCollectionTypeState,
                                 page.danmakuStatistics,
                                 vm.videoStatisticsFlow,
-                                page.authState,
+                                page.selfInfo,
                                 onSwitchEpisode = { episodeId ->
                                     if (!vm.episodeSelectorState.selectEpisodeId(episodeId)) {
                                         navigator.navigateEpisodeDetails(vm.subjectId, episodeId)
@@ -660,7 +660,7 @@ private fun EpisodeScreenContentPhone(
                 vm.editableSubjectCollectionTypeState,
                 page.danmakuStatistics,
                 vm.videoStatisticsFlow,
-                page.authState,
+                page.selfInfo,
                 onSwitchEpisode = { episodeId ->
                     if (!vm.episodeSelectorState.selectEpisodeId(episodeId)) {
                         navigator.navigateEpisodeDetails(vm.subjectId, episodeId)
