@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * @param id
+ * @param id 
  * @param senderId 
  * @param danmakuInfo 
  */

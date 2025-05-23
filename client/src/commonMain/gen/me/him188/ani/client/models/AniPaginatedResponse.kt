@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * @param total
+ * @param total 
  * @param items 
  */
 @Serializable
@@ -31,7 +31,7 @@ data class AniPaginatedResponse(
 
     @SerialName(value = "total") @Required val total: kotlin.Long,
 
-    @SerialName(value = "items") @Required val items: kotlin.collections.List<AniEpisodeCollectionEntity>
+    @SerialName(value = "items") @Required val items: kotlin.collections.List<AniSubjectCollection>
 
 ) {
 

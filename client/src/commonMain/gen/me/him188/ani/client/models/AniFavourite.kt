@@ -21,18 +21,27 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * 
  *
- * @param template 
- * @param fields 
+ *
+ * @param wish
+ * @param done
+ * @param doing
+ * @param onHold
+ * @param dropped
  */
 @Serializable
 
-data class AniInfoboxEntity(
+data class AniFavourite(
 
-    @SerialName(value = "template") @Required val template: kotlin.String,
+    @SerialName(value = "wish") @Required val wish: kotlin.Int,
 
-    @SerialName(value = "fields") @Required val fields: kotlin.collections.Map<kotlin.String, kotlin.String>
+    @SerialName(value = "done") @Required val done: kotlin.Int,
+
+    @SerialName(value = "doing") @Required val doing: kotlin.Int,
+
+    @SerialName(value = "onHold") @Required val onHold: kotlin.Int,
+
+    @SerialName(value = "dropped") @Required val dropped: kotlin.Int
 
 ) {
 

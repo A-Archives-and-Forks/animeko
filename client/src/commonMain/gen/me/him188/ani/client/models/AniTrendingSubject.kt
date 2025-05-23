@@ -23,7 +23,7 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * @param bangumiId
+ * @param bangumiId 
  * @param nameCn 
  * @param imageLarge 
  */

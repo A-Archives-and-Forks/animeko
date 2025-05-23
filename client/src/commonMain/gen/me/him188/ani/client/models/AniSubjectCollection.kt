@@ -20,13 +20,14 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * 
+ *
  *
  * @param id
  * @param type
  * @param tags
  * @param metaTags
  * @param scoreDetails
+ * @param episodes 条目对应的剧集的收藏状态
  * @param name
  * @param nameCn
  * @param infobox
@@ -35,30 +36,34 @@ import kotlinx.serialization.Serializable
  * @param nsfw
  * @param date
  * @param favorite
- * @param series
  * @param score
- * @param rank 
- * @param collectionType 
+ * @param rank
+ * @param collectionType
+ * @param airingInfo
+ * @param relations
  */
 @Serializable
 
-data class AniSubjectCollectionEntity(
+data class AniSubjectCollection(
 
     @SerialName(value = "id") @Required val id: kotlin.Long,
 
-    @SerialName(value = "type") @Required val type: kotlin.Int,
+    @SerialName(value = "type") @Required val type: AniSubjectType,
 
-    @SerialName(value = "tags") @Required val tags: kotlin.collections.List<AniTagEntity>,
+    @SerialName(value = "tags") @Required val tags: kotlin.collections.List<AniTag>,
 
     @SerialName(value = "metaTags") @Required val metaTags: kotlin.collections.List<kotlin.String>,
 
     @SerialName(value = "scoreDetails") @Required val scoreDetails: kotlin.collections.Map<kotlin.String, kotlin.Int>,
 
+    /* 条目对应的剧集的收藏状态 */
+    @SerialName(value = "episodes") @Required val episodes: kotlin.collections.List<AniEpisodeCollection>,
+
     @SerialName(value = "name") val name: kotlin.String? = null,
 
     @SerialName(value = "nameCn") val nameCn: kotlin.String? = null,
 
-    @SerialName(value = "infobox") val infobox: AniInfoboxEntity? = null,
+    @SerialName(value = "infobox") val infobox: AniInfobox? = null,
 
     @SerialName(value = "platform") val platform: kotlin.Int? = null,
 
@@ -68,15 +73,17 @@ data class AniSubjectCollectionEntity(
 
     @SerialName(value = "date") val date: kotlin.String? = null,
 
-    @SerialName(value = "favorite") val favorite: AniFavouriteEntity? = null,
-
-    @SerialName(value = "series") val series: kotlin.Boolean? = null,
+    @SerialName(value = "favorite") val favorite: AniFavourite? = null,
 
     @SerialName(value = "score") val score: kotlin.String? = null,
 
     @SerialName(value = "rank") val rank: kotlin.Int? = null,
 
-    @SerialName(value = "collectionType") val collectionType: AniCollectionType? = null
+    @SerialName(value = "collectionType") val collectionType: AniCollectionType? = null,
+
+    @SerialName(value = "airingInfo") val airingInfo: AniSubjectAiringInfo? = null,
+
+    @SerialName(value = "relations") val relations: AniSubjectRelations? = null
 
 ) {
 

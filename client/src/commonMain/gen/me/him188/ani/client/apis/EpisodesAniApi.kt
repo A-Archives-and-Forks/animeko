@@ -15,7 +15,10 @@
 
 package me.him188.ani.client.apis
 
-import me.him188.ani.client.models.AniLoginResponse
+import me.him188.ani.client.models.AniCollectionType
+import me.him188.ani.client.models.AniEpisodeCollectionEntity
+import me.him188.ani.client.models.AniPaginatedResponse
+import me.him188.ani.client.models.AniUpdateEpisodeCollectionRequest
 
 import me.him188.ani.client.infrastructure.*
 import io.ktor.client.HttpClient
@@ -28,7 +31,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
-open class BangumiAniApi : ApiClient {
+open class EpisodesAniApi : ApiClient {
 
     constructor(
         baseUrl: String = ApiClient.BASE_URL,
@@ -48,63 +51,25 @@ open class BangumiAniApi : ApiClient {
     ) : super(baseUrl = baseUrl, httpClient = httpClient)
 
     /**
-     * 绑定 Bangumi 账号
-     * 绑定 Bangumi 账号
-     * @param requestId
-     * @param os 
-     * @param arch 
-     * @return void
-     */
-    open suspend fun bind(requestId: kotlin.String, os: kotlin.String, arch: kotlin.String): HttpResponse<Unit> {
-
-        val localVariableAuthNames = listOf<String>("auth-jwt")
-
-        val localVariableBody = 
-            io.ktor.client.utils.EmptyContent
-
-        val localVariableQuery = mutableMapOf<String, List<String>>()
-        requestId?.apply { localVariableQuery["requestId"] = listOf("$requestId") }
-        os?.apply { localVariableQuery["os"] = listOf("$os") }
-        arch?.apply { localVariableQuery["arch"] = listOf("$arch") }
-        val localVariableHeaders = mutableMapOf<String, String>()
-
-        val localVariableConfig = RequestConfig<kotlin.Any?>(
-            RequestMethod.GET,
-            "/v2/users/bangumi/bind",
-            query = localVariableQuery,
-            headers = localVariableHeaders,
-            requiresAuthentication = true,
-        )
-
-        return request(
-            localVariableConfig,
-            localVariableBody,
-            localVariableAuthNames,
-        ).wrap()
-    }
-
-
-    /**
-     * 获取登录结果
-     * 获取登录结果
-     * @param requestId 
-     * @return AniLoginResponse
+     * 删除剧集收藏
+     * 删除剧集收藏
+     * @param episodeId
+     * @return kotlin.Any
      */
     @Suppress("UNCHECKED_CAST")
-    open suspend fun getToken(requestId: kotlin.String): HttpResponse<AniLoginResponse> {
+    open suspend fun deleteEpisodeCollection(episodeId: kotlin.Long): HttpResponse<kotlin.Any> {
 
         val localVariableAuthNames = listOf<String>("auth-jwt")
 
-        val localVariableBody = 
+        val localVariableBody =
             io.ktor.client.utils.EmptyContent
 
         val localVariableQuery = mutableMapOf<String, List<String>>()
-        requestId?.apply { localVariableQuery["requestId"] = listOf("$requestId") }
         val localVariableHeaders = mutableMapOf<String, String>()
 
         val localVariableConfig = RequestConfig<kotlin.Any?>(
-            RequestMethod.GET,
-            "/v2/users/bangumi/result",
+            RequestMethod.DELETE,
+            "/v2/episodes/{episodeId}".replace("{" + "episodeId" + "}", "$episodeId"),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -119,29 +84,25 @@ open class BangumiAniApi : ApiClient {
 
 
     /**
-     * 获取 Bangumi OAuth 授权链接
-     * 获取 Bangumi OAuth 授权链接
-     * @param requestId
-     * @param os 
-     * @param arch 
-     * @return void
+     * 获取单个剧集信息
+     * 获取单个剧集信息
+     * @param episodeId
+     * @return AniEpisodeCollectionEntity
      */
-    open suspend fun oauth(requestId: kotlin.String, os: kotlin.String, arch: kotlin.String): HttpResponse<Unit> {
+    @Suppress("UNCHECKED_CAST")
+    open suspend fun getEpisodeCollection(episodeId: kotlin.Long): HttpResponse<AniEpisodeCollectionEntity> {
 
         val localVariableAuthNames = listOf<String>("auth-jwt")
 
-        val localVariableBody = 
+        val localVariableBody =
             io.ktor.client.utils.EmptyContent
 
         val localVariableQuery = mutableMapOf<String, List<String>>()
-        requestId?.apply { localVariableQuery["requestId"] = listOf("$requestId") }
-        os?.apply { localVariableQuery["os"] = listOf("$os") }
-        arch?.apply { localVariableQuery["arch"] = listOf("$arch") }
         val localVariableHeaders = mutableMapOf<String, String>()
 
         val localVariableConfig = RequestConfig<kotlin.Any?>(
             RequestMethod.GET,
-            "/v2/users/bangumi/oauth",
+            "/v2/episodes/{episodeId}".replace("{" + "episodeId" + "}", "$episodeId"),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -156,33 +117,79 @@ open class BangumiAniApi : ApiClient {
 
 
     /**
-     * Bangumi OAuth 回调
-     * Bangumi OAuth 回调
-     * @param code 
-     * @param state 
-     * @return void
+     * 获取某条目的剧集收藏列表
+     * 获取某条目的剧集收藏列表
+     * @param subjectId
+     * @param offset  (optional)
+     * @param limit  (optional)
+     * @param type  (optional)
+     * @return AniPaginatedResponse
      */
-    open suspend fun oauthCallback(code: kotlin.String, state: kotlin.String): HttpResponse<Unit> {
+    @Suppress("UNCHECKED_CAST")
+    open suspend fun getEpisodeCollections(
+        subjectId: kotlin.Long,
+        offset: kotlin.Int? = null,
+        limit: kotlin.Int? = null,
+        type: AniCollectionType? = null
+    ): HttpResponse<AniPaginatedResponse> {
 
         val localVariableAuthNames = listOf<String>("auth-jwt")
 
-        val localVariableBody = 
+        val localVariableBody =
             io.ktor.client.utils.EmptyContent
 
         val localVariableQuery = mutableMapOf<String, List<String>>()
-        code?.apply { localVariableQuery["code"] = listOf("$code") }
-        state?.apply { localVariableQuery["state"] = listOf("$state") }
+        subjectId?.apply { localVariableQuery["subjectId"] = listOf("$subjectId") }
+        offset?.apply { localVariableQuery["offset"] = listOf("$offset") }
+        limit?.apply { localVariableQuery["limit"] = listOf("$limit") }
+        type?.apply { localVariableQuery["type"] = listOf("$type") }
         val localVariableHeaders = mutableMapOf<String, String>()
 
         val localVariableConfig = RequestConfig<kotlin.Any?>(
             RequestMethod.GET,
-            "/v2/users/bangumi/oauth/callback",
+            "/v2/episodes/list",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
         )
 
         return request(
+            localVariableConfig,
+            localVariableBody,
+            localVariableAuthNames,
+        ).wrap()
+    }
+
+
+    /**
+     * 更新剧集收藏
+     * 更新剧集收藏
+     * @param episodeId
+     * @param aniUpdateEpisodeCollectionRequest  (optional)
+     * @return kotlin.Any
+     */
+    @Suppress("UNCHECKED_CAST")
+    open suspend fun updateEpisodeCollection(
+        episodeId: kotlin.Long,
+        aniUpdateEpisodeCollectionRequest: AniUpdateEpisodeCollectionRequest? = null
+    ): HttpResponse<kotlin.Any> {
+
+        val localVariableAuthNames = listOf<String>("auth-jwt")
+
+        val localVariableBody = aniUpdateEpisodeCollectionRequest
+
+        val localVariableQuery = mutableMapOf<String, List<String>>()
+        val localVariableHeaders = mutableMapOf<String, String>()
+
+        val localVariableConfig = RequestConfig<kotlin.Any?>(
+            RequestMethod.PATCH,
+            "/v2/episodes/{episodeId}".replace("{" + "episodeId" + "}", "$episodeId"),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+        )
+
+        return jsonRequest(
             localVariableConfig,
             localVariableBody,
             localVariableAuthNames,

@@ -23,7 +23,7 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * @param otpId
+ * @param otpId 
  * @param otpValue 
  */
 @Serializable

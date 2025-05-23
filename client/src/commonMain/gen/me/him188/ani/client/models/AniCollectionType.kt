@@ -20,24 +20,27 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * 
  *
- * Values: WINTER,SPRING,SUMMER,AUTUMN
+ *
+ * Values: WISH,DONE,DOING,ON_HOLD,DROPPED
  */
 @Serializable
-enum class AniAnimeSeason(val value: kotlin.String) {
+enum class AniCollectionType(val value: kotlin.String) {
 
-    @SerialName(value = "WINTER")
-    WINTER("WINTER"),
+    @SerialName(value = "WISH")
+    WISH("WISH"),
 
-    @SerialName(value = "SPRING")
-    SPRING("SPRING"),
+    @SerialName(value = "DONE")
+    DONE("DONE"),
 
-    @SerialName(value = "SUMMER")
-    SUMMER("SUMMER"),
+    @SerialName(value = "DOING")
+    DOING("DOING"),
 
-    @SerialName(value = "AUTUMN")
-    AUTUMN("AUTUMN");
+    @SerialName(value = "ON_HOLD")
+    ON_HOLD("ON_HOLD"),
+
+    @SerialName(value = "DROPPED")
+    DROPPED("DROPPED");
 
     /**
      * Override [toString()] to avoid using the enum variable name as the value, and instead use
@@ -52,12 +55,12 @@ enum class AniAnimeSeason(val value: kotlin.String) {
         /**
          * Converts the provided [data] to a [String] on success, null otherwise.
          */
-        fun encode(data: kotlin.Any?): kotlin.String? = if (data is AniAnimeSeason) "$data" else null
+        fun encode(data: kotlin.Any?): kotlin.String? = if (data is AniCollectionType) "$data" else null
 
         /**
-         * Returns a valid [AniAnimeSeason] for [data], null otherwise.
+         * Returns a valid [AniCollectionType] for [data], null otherwise.
          */
-        fun decode(data: kotlin.Any?): AniAnimeSeason? = data?.let {
+        fun decode(data: kotlin.Any?): AniCollectionType? = data?.let {
             val normalizedData = "$it".lowercase()
             values().firstOrNull { value ->
                 it == value || normalizedData == "$value".lowercase()

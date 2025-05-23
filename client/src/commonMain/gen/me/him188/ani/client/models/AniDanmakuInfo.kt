@@ -22,8 +22,8 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * @param playTime 
- * @param color
+ * @param playTime
+ * @param color 
  * @param text 
  * @param location 
  */

@@ -16,9 +16,9 @@
 package me.him188.ani.client.models
 
 
-import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.encoding.*
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * 
@@ -31,7 +31,7 @@ import kotlinx.serialization.encoding.*
  * @param mediumAvatar
  * @param largeAvatar
  * @param registerTime
- * @param lastLoginTime
+ * @param lastLoginTime 
  * @param clientVersion 
  */
 @Serializable

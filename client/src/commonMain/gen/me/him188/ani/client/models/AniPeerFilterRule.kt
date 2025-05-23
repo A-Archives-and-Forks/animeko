@@ -24,7 +24,7 @@ import kotlinx.serialization.Serializable
  * 
  *
  * @param blockedIpPattern
- * @param blockedIdRegex
+ * @param blockedIdRegex 
  * @param blockedClientRegex 
  */
 @Serializable

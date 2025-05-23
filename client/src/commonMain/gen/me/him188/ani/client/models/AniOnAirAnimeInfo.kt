@@ -22,9 +22,9 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * @param bangumiId
- * @param name 
- * @param aliases
+ * @param bangumiId 
+ * @param name
+ * @param aliases 
  * @param begin 
  * @param recurrence 
  * @param end 

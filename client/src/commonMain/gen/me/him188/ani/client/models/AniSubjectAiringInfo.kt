@@ -15,24 +15,25 @@
 
 package me.him188.ani.client.models
 
-
-import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * 
+ * 新番连载信息, 如果是完结番则为 null
  *
- * @param template 
- * @param fields 
+ * @param begin
+ * @param recurrence
+ * @param end
  */
 @Serializable
 
-data class AniInfoboxEntity(
+data class AniSubjectAiringInfo(
 
-    @SerialName(value = "template") @Required val template: kotlin.String,
+    @SerialName(value = "begin") val begin: kotlin.String? = null,
 
-    @SerialName(value = "fields") @Required val fields: kotlin.collections.Map<kotlin.String, kotlin.String>
+    @SerialName(value = "recurrence") val recurrence: AniAnimeRecurrence? = null,
+
+    @SerialName(value = "end") val end: kotlin.String? = null
 
 ) {
 

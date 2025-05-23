@@ -23,8 +23,8 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * @param version 
- * @param downloadUrlAlternatives
+ * @param version
+ * @param downloadUrlAlternatives 
  * @param publishTime 
  * @param description 
  */

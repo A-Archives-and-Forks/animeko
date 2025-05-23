@@ -21,18 +21,18 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * 
  *
- * @param template 
- * @param fields 
+ *
+ * @param name
+ * @param count
  */
 @Serializable
 
-data class AniInfoboxEntity(
+data class AniTag(
 
-    @SerialName(value = "template") @Required val template: kotlin.String,
+    @SerialName(value = "name") @Required val name: kotlin.String,
 
-    @SerialName(value = "fields") @Required val fields: kotlin.collections.Map<kotlin.String, kotlin.String>
+    @SerialName(value = "count") @Required val count: kotlin.Int
 
 ) {
 

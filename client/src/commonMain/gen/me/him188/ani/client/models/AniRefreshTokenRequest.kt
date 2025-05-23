@@ -21,18 +21,15 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * 
  *
- * @param template 
- * @param fields 
+ *
+ * @param refreshToken
  */
 @Serializable
 
-data class AniInfoboxEntity(
+data class AniRefreshTokenRequest(
 
-    @SerialName(value = "template") @Required val template: kotlin.String,
-
-    @SerialName(value = "fields") @Required val fields: kotlin.collections.Map<kotlin.String, kotlin.String>
+    @SerialName(value = "refreshToken") @Required val refreshToken: kotlin.String
 
 ) {
 
