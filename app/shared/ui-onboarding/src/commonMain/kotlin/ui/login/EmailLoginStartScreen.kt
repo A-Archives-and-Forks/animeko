@@ -41,7 +41,7 @@ fun EmailLoginStartScreen(
     val asyncHandler = rememberAsyncHandler()
     EmailLoginStartScreenImpl(
         state.email,
-        onEmailChange = { vm.setEmail(email = state.email) },
+        onEmailChange = { vm.setEmail(email = it) },
         onContinueClick = {
             asyncHandler.launch {
                 vm.sendEmailOtp()
