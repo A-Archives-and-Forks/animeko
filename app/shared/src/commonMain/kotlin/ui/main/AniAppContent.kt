@@ -186,7 +186,7 @@ private fun AniAppContentImpl(
                         aniNavigator.navigateSettings()
                     },
                     onNavigateBack = {
-                        aniNavigator.popBackStack(NavRoutes.Welcome, true)
+                        aniNavigator.popBackStack(NavRoutes.EmailLoginStart, true)
                     },
                 )
             }
@@ -208,7 +208,7 @@ private fun AniAppContentImpl(
                         aniNavigator.navigateSettings()
                     },
                     onNavigateBack = {
-                        aniNavigator.popBackStack(NavRoutes.Welcome, true)
+                        aniNavigator.popBackStack(NavRoutes.EmailLoginVerify, true)
                     },
                 )
             }
