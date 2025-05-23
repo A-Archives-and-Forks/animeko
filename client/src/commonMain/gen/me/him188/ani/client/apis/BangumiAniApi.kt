@@ -50,7 +50,7 @@ open class BangumiAniApi : ApiClient {
     /**
      * 绑定 Bangumi 账号
      * 绑定 Bangumi 账号
-     * @param requestId
+     * @param requestId 
      * @param os 
      * @param arch 
      * @return void
@@ -121,7 +121,7 @@ open class BangumiAniApi : ApiClient {
     /**
      * 获取 Bangumi OAuth 授权链接
      * 获取 Bangumi OAuth 授权链接
-     * @param requestId
+     * @param requestId 
      * @param os 
      * @param arch 
      * @return void

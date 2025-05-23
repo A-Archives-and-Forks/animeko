@@ -15,22 +15,16 @@
 
 package me.him188.ani.client.models
 
-import me.him188.ani.client.models.AniAnimeSeasonId
 
-import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.encoding.*
+import kotlinx.serialization.Serializable
 
 /**
- * 
+ * 如果不为空, 则必定为浮点
  *
- * @param list 
  */
 @Serializable
 
-data class AniAnimeSeasonIdList(
-
-    @SerialName(value = "list") @Required val list: kotlin.collections.List<AniAnimeSeasonId>
+class AniString(
 
 ) {
 

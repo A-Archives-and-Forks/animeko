@@ -16,18 +16,37 @@
 package me.him188.ani.client.models
 
 
-import kotlinx.serialization.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
- * 
  *
- * Values: ANIME
+ *
+ * Values: MAIN,SPECIAL,OP,ED,TRAILER,MAD,OTHER
  */
 @Serializable
-enum class AniSubjectType(val value: kotlin.String) {
+enum class AniEpisodeType(val value: kotlin.String) {
 
-    @SerialName(value = "ANIME")
-    ANIME("ANIME");
+    @SerialName(value = "MAIN")
+    MAIN("MAIN"),
+
+    @SerialName(value = "SPECIAL")
+    SPECIAL("SPECIAL"),
+
+    @SerialName(value = "OP")
+    OP("OP"),
+
+    @SerialName(value = "ED")
+    ED("ED"),
+
+    @SerialName(value = "TRAILER")
+    TRAILER("TRAILER"),
+
+    @SerialName(value = "MAD")
+    MAD("MAD"),
+
+    @SerialName(value = "OTHER")
+    OTHER("OTHER");
 
     /**
      * Override [toString()] to avoid using the enum variable name as the value, and instead use
@@ -42,12 +61,12 @@ enum class AniSubjectType(val value: kotlin.String) {
         /**
          * Converts the provided [data] to a [String] on success, null otherwise.
          */
-        fun encode(data: kotlin.Any?): kotlin.String? = if (data is AniSubjectType) "$data" else null
+        fun encode(data: kotlin.Any?): kotlin.String? = if (data is AniEpisodeType) "$data" else null
 
         /**
-         * Returns a valid [AniSubjectType] for [data], null otherwise.
+         * Returns a valid [AniEpisodeType] for [data], null otherwise.
          */
-        fun decode(data: kotlin.Any?): AniSubjectType? = data?.let {
+        fun decode(data: kotlin.Any?): AniEpisodeType? = data?.let {
             val normalizedData = "$it".lowercase()
             values().firstOrNull { value ->
                 it == value || normalizedData == "$value".lowercase()

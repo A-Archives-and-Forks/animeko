@@ -15,15 +15,17 @@
 
 package me.him188.ani.client.models
 
-import kotlinx.serialization.Required
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import me.him188.ani.client.models.AniAnimeRecurrence
+
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
 
 /**
  * 
  *
- * @param bangumiId 
- * @param name
+ * @param bangumiId
+ * @param name 
  * @param aliases 
  * @param begin 
  * @param recurrence 

@@ -53,7 +53,7 @@ open class EpisodesAniApi : ApiClient {
     /**
      * 删除剧集收藏
      * 删除剧集收藏
-     * @param episodeId
+     * @param episodeId 
      * @return kotlin.Any
      */
     @Suppress("UNCHECKED_CAST")
@@ -61,7 +61,7 @@ open class EpisodesAniApi : ApiClient {
 
         val localVariableAuthNames = listOf<String>("auth-jwt")
 
-        val localVariableBody =
+        val localVariableBody = 
             io.ktor.client.utils.EmptyContent
 
         val localVariableQuery = mutableMapOf<String, List<String>>()
@@ -86,7 +86,7 @@ open class EpisodesAniApi : ApiClient {
     /**
      * 获取单个剧集信息
      * 获取单个剧集信息
-     * @param episodeId
+     * @param episodeId 
      * @return AniEpisodeCollectionEntity
      */
     @Suppress("UNCHECKED_CAST")
@@ -94,7 +94,7 @@ open class EpisodesAniApi : ApiClient {
 
         val localVariableAuthNames = listOf<String>("auth-jwt")
 
-        val localVariableBody =
+        val localVariableBody = 
             io.ktor.client.utils.EmptyContent
 
         val localVariableQuery = mutableMapOf<String, List<String>>()
@@ -119,7 +119,7 @@ open class EpisodesAniApi : ApiClient {
     /**
      * 获取某条目的剧集收藏列表
      * 获取某条目的剧集收藏列表
-     * @param subjectId
+     * @param subjectId 
      * @param offset  (optional)
      * @param limit  (optional)
      * @param type  (optional)
@@ -135,7 +135,7 @@ open class EpisodesAniApi : ApiClient {
 
         val localVariableAuthNames = listOf<String>("auth-jwt")
 
-        val localVariableBody =
+        val localVariableBody = 
             io.ktor.client.utils.EmptyContent
 
         val localVariableQuery = mutableMapOf<String, List<String>>()
@@ -164,7 +164,7 @@ open class EpisodesAniApi : ApiClient {
     /**
      * 更新剧集收藏
      * 更新剧集收藏
-     * @param episodeId
+     * @param episodeId 
      * @param aniUpdateEpisodeCollectionRequest  (optional)
      * @return kotlin.Any
      */

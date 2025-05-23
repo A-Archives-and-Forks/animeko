@@ -15,12 +15,15 @@
 
 package me.him188.ani.client.models
 
-import kotlinx.serialization.Required
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import me.him188.ani.client.models.AniEpisodeCollectionType
+import me.him188.ani.client.models.AniEpisodeType
+
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
 
 /**
- *
+ * 
  *
  * @param episodeId
  * @param subjectId
@@ -32,7 +35,7 @@ import kotlinx.serialization.Serializable
  * @param airdate
  * @param disc
  * @param duration
- * @param collectionType
+ * @param collectionType 
  */
 @Serializable
 
@@ -44,13 +47,13 @@ data class AniEpisodeCollection(
 
     @SerialName(value = "sort") @Required val sort: kotlin.String,
 
-    @SerialName(value = "type") @Required val type: kotlin.Int,
+    @SerialName(value = "type") @Required val type: AniEpisodeType,
 
-    @SerialName(value = "name") val name: kotlin.String? = null,
+    @SerialName(value = "name") @Required val name: kotlin.String,
 
-    @SerialName(value = "nameCn") val nameCn: kotlin.String? = null,
+    @SerialName(value = "nameCn") @Required val nameCn: kotlin.String,
 
-    @SerialName(value = "description") val description: kotlin.String? = null,
+    @SerialName(value = "description") @Required val description: kotlin.String,
 
     @SerialName(value = "airdate") val airdate: kotlin.String? = null,
 

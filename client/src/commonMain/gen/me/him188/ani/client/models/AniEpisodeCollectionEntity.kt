@@ -15,12 +15,14 @@
 
 package me.him188.ani.client.models
 
-import kotlinx.serialization.Required
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import me.him188.ani.client.models.AniCollectionType
+
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
 
 /**
- *
+ * 
  *
  * @param episodeId
  * @param subjectId
@@ -32,7 +34,7 @@ import kotlinx.serialization.Serializable
  * @param airdate
  * @param disc
  * @param duration
- * @param collectionType
+ * @param collectionType 
  */
 @Serializable
 

@@ -118,7 +118,7 @@ open class SubjectsAniApi : ApiClient {
     /**
      * 获取单个条目信息. 如果已登录, 还会返回 collectionType 等字段.
      * 获取单个条目信息. 如果已登录, 还会返回 collectionType 等字段.
-     * @param subjectId
+     * @param subjectId 
      * @return AniSubjectCollection
      */
     @Suppress("UNCHECKED_CAST")

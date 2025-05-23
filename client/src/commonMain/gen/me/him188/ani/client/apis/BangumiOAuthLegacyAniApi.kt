@@ -83,6 +83,7 @@ open class BangumiOAuthLegacyAniApi : ApiClient {
     }
 
 
+
     /**
      * Bangumi OAuth 回调
      * 用于 Bangumi OAuth 授权回调，用户不应自行调用该接口。
@@ -94,7 +95,7 @@ open class BangumiOAuthLegacyAniApi : ApiClient {
 
         val localVariableAuthNames = listOf<String>()
 
-        val localVariableBody =
+        val localVariableBody = 
             io.ktor.client.utils.EmptyContent
 
         val localVariableQuery = mutableMapOf<String, List<String>>()
@@ -128,7 +129,7 @@ open class BangumiOAuthLegacyAniApi : ApiClient {
 
         val localVariableAuthNames = listOf<String>()
 
-        val localVariableBody =
+        val localVariableBody = 
             io.ktor.client.utils.EmptyContent
 
         val localVariableQuery = mutableMapOf<String, List<String>>()
@@ -162,7 +163,7 @@ open class BangumiOAuthLegacyAniApi : ApiClient {
 
         val localVariableAuthNames = listOf<String>()
 
-        val localVariableBody =
+        val localVariableBody = 
             io.ktor.client.utils.EmptyContent
 
         val localVariableQuery = mutableMapOf<String, List<String>>()

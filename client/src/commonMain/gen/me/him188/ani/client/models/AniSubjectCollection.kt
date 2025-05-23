@@ -15,32 +15,43 @@
 
 package me.him188.ani.client.models
 
-import kotlinx.serialization.Required
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import me.him188.ani.client.models.AniCollectionType
+import me.him188.ani.client.models.AniEpisodeCollection
+import me.him188.ani.client.models.AniFavourite
+import me.him188.ani.client.models.AniInfobox
+import me.him188.ani.client.models.AniSubjectAiringInfo
+import me.him188.ani.client.models.AniSubjectRelations
+import me.him188.ani.client.models.AniSubjectType
+import me.him188.ani.client.models.AniTag
+
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
 
 /**
- *
+ * 
  *
  * @param id
  * @param type
- * @param tags
- * @param metaTags
- * @param scoreDetails
- * @param episodes 条目对应的剧集的收藏状态
  * @param name
  * @param nameCn
- * @param infobox
- * @param platform
  * @param summary
  * @param nsfw
- * @param date
+ * @param airDate
+ * @param aliases
  * @param favorite
- * @param score
+ * @param tags
+ * @param metaTags
+ * @param scoreDetails 
+ * @param episodes 条目对应的剧集的收藏状态
+ * @param infobox
+ * @param platform
+ * @param score 如果不为空, 则必定为浮点
  * @param rank
  * @param collectionType
  * @param airingInfo
  * @param relations
+ * @param updatedAt 收藏更新的时间. 如果没有收藏, 则为 `null`.
  */
 @Serializable
 
@@ -49,6 +60,20 @@ data class AniSubjectCollection(
     @SerialName(value = "id") @Required val id: kotlin.Long,
 
     @SerialName(value = "type") @Required val type: AniSubjectType,
+
+    @SerialName(value = "name") @Required val name: kotlin.String,
+
+    @SerialName(value = "nameCn") @Required val nameCn: kotlin.String,
+
+    @SerialName(value = "summary") @Required val summary: kotlin.String,
+
+    @SerialName(value = "nsfw") @Required val nsfw: kotlin.Boolean,
+
+    @SerialName(value = "airDate") @Required val airDate: kotlin.String,
+
+    @SerialName(value = "aliases") @Required val aliases: kotlin.collections.List<kotlin.String>,
+
+    @SerialName(value = "favorite") @Required val favorite: AniFavourite,
 
     @SerialName(value = "tags") @Required val tags: kotlin.collections.List<AniTag>,
 
@@ -59,22 +84,11 @@ data class AniSubjectCollection(
     /* 条目对应的剧集的收藏状态 */
     @SerialName(value = "episodes") @Required val episodes: kotlin.collections.List<AniEpisodeCollection>,
 
-    @SerialName(value = "name") val name: kotlin.String? = null,
-
-    @SerialName(value = "nameCn") val nameCn: kotlin.String? = null,
-
     @SerialName(value = "infobox") val infobox: AniInfobox? = null,
 
     @SerialName(value = "platform") val platform: kotlin.Int? = null,
 
-    @SerialName(value = "summary") val summary: kotlin.String? = null,
-
-    @SerialName(value = "nsfw") val nsfw: kotlin.Boolean? = null,
-
-    @SerialName(value = "date") val date: kotlin.String? = null,
-
-    @SerialName(value = "favorite") val favorite: AniFavourite? = null,
-
+    /* 如果不为空, 则必定为浮点 */
     @SerialName(value = "score") val score: kotlin.String? = null,
 
     @SerialName(value = "rank") val rank: kotlin.Int? = null,
@@ -83,7 +97,10 @@ data class AniSubjectCollection(
 
     @SerialName(value = "airingInfo") val airingInfo: AniSubjectAiringInfo? = null,
 
-    @SerialName(value = "relations") val relations: AniSubjectRelations? = null
+    @SerialName(value = "relations") val relations: AniSubjectRelations? = null,
+
+    /* 收藏更新的时间. 如果没有收藏, 则为 `null`. */
+    @SerialName(value = "updatedAt") val updatedAt: kotlin.String? = null
 
 ) {
 
