@@ -88,7 +88,7 @@ internal fun EmailLoginStartScreenImpl(
             label = {
                 Text("邮箱")
             },
-            isError = email.isNotEmpty() && !email.contains('@'),
+            isError = email.isNotEmpty() && (!email.contains('@') || !email.contains('.')),
             singleLine = true,
             keyboardOptions = KeyboardOptions.Default.copy(
                 autoCorrectEnabled = false,
