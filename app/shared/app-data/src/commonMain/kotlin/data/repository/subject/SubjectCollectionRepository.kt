@@ -578,7 +578,9 @@ class SubjectCollectionRepositoryImpl(
     }
 
     private suspend fun deleteSubjectCollection(subjectId: Int) {
-        // TODO: deleteSubjectCollection
+        withContext(defaultDispatcher) {
+            bangumiSubjectService.deleteSubjectCollection(subjectId)
+        }
     }
 
     private companion object {
