@@ -1,4 +1,5 @@
 // @formatter:off
+// @formatter:off
 /**
  *
  * Please note:
@@ -49,5 +50,7 @@ data class AniFavouriteEntity (
 
 }
 
+
+// @formatter:on
 
 // @formatter:on
