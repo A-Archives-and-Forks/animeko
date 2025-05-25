@@ -66,9 +66,9 @@ class OAuthConfigurator(
 
             var oAuthResult: OAuthResult? = null
             while (oAuthResult == null) {
+                delay(1.seconds)
                 oAuthResult = client.getResult(requestId)
                 logger.info { "Check oauth result of request id $requestId: ${oAuthResult != null}" }
-                delay(1.seconds)
             }
 
             _state.value = State.Success(requestId, oAuthResult)
@@ -90,7 +90,7 @@ class OAuthConfigurator(
                 is AlreadyBoundException ->
                     _state.value = State.KnownError(State.ErrorType.AlreadyBound, ex)
 
-                is InvalidBangumiTokenException ->
+                is InvalidTokenException ->
                     _state.value = State.KnownError(State.ErrorType.InvalidBangumiToken, ex)
 
                 is NotSupportedForRegistration ->

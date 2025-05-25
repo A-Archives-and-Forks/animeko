@@ -70,7 +70,7 @@ sealed class OAuthException : Exception()
 /**
  * 当回调的 Bangumi token 无效时抛出此异常.
  */
-class InvalidBangumiTokenException(override val message: String? = null) : OAuthException()
+class InvalidTokenException(override val message: String? = null) : OAuthException()
 
 /**
  * 当登录的 Bangumi 账号已经绑定了其他的 Ani 账号时抛出此异常.
@@ -125,7 +125,7 @@ class BangumiOAuthClient(
         } catch (ex: ClientRequestException) {
             when (ex.response.status) {
                 HttpStatusCode.TooEarly -> return null
-                HttpStatusCode.BadRequest -> throw InvalidBangumiTokenException(ex.response.bodyAsText())
+                HttpStatusCode.BadRequest -> throw InvalidTokenException(ex.response.bodyAsText())
                 HttpStatusCode.Conflict -> throw AlreadyBoundException(ex.response.bodyAsText())
                 else -> throw ex
             }
