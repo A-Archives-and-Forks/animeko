@@ -44,18 +44,19 @@ class OAuthConfigurator(
     /**
      * 启动 oAuth 验证
      */
-    suspend fun start() {
+    suspend fun start(isRegister: Boolean) {
         val requestId = Uuid.random(random).toString()
         val tokenDeferred = CompletableDeferred<OAuthResult>()
 
         logger.info { "OAuth started, request id: $requestId" }
         _state.value = State.AwaitingResult(requestId, tokenDeferred)
 
-        val hasLogonAni = sessionStateProvider.canAccessAniApiNow()
-
         try {
-            val externalUrl = if (hasLogonAni) {
+            val externalUrl = if (!isRegister) {
                 logger.info { "Request bind, request id: $requestId" }
+                check(sessionStateProvider.canAccessAniApiNow()) {
+                    "Cannot bind account because ani account is not logged in."
+                }
                 client.getOAuthBindLink(requestId)
             } else {
                 logger.info { "Request register, request id: $requestId" }
