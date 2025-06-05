@@ -108,8 +108,6 @@ import me.him188.ani.app.domain.session.AniSessionRefresher
 import me.him188.ani.app.domain.session.SessionManager
 import me.him188.ani.app.domain.session.SessionStateProvider
 import me.him188.ani.app.domain.session.auth.BangumiOAuthClient
-import me.him188.ani.app.domain.session.auth.LegacyOAuthClient
-import me.him188.ani.app.domain.session.auth.LegacyOAuthClientImpl
 import me.him188.ani.app.domain.session.auth.OAuthClient
 import me.him188.ani.app.domain.settings.ProxyProvider
 import me.him188.ani.app.domain.settings.SettingsBasedProxyProvider
@@ -188,7 +186,6 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
         )
     }
     single<AniApiProvider> { AniApiProvider(get<HttpClientProvider>().get(useAniToken = true)) }
-    single<OAuthClient> { BangumiOAuthClient(get<AniApiProvider>().bangumiApi, get<SessionStateProvider>()) }
     single<TokenRepository> { TokenRepository(getContext().dataStores.tokenStore) }
     single<EpisodePreferencesRepository> { EpisodePreferencesRepositoryImpl(getContext().dataStores.preferredAllianceStore) }
     single<BangumiClient> {

@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.first
 import me.him188.ani.app.domain.session.AccessTokenPair
 import me.him188.ani.app.domain.session.SessionState
 import me.him188.ani.app.domain.session.SessionStateProvider
+import me.him188.ani.app.domain.session.canAccessAniApiNow
+import me.him188.ani.app.domain.session.canAccessBangumiApiNow
 import me.him188.ani.app.domain.session.checkAccessBangumiApiNow
 import me.him188.ani.client.apis.BangumiAniApi
 import me.him188.ani.utils.ktor.ApiInvoker
@@ -87,7 +89,7 @@ class BangumiOAuthClient(
     override suspend fun getOAuthRegisterLink(requestId: String): String {
         require(requestId.isNotBlank()) { "requestId must not be blank or empty" }
         val resp = bangumiApi.invoke {
-            oauth(requestId, platform.name, platform.arch.displayName)
+            oauth(requestId, platform.name.lowercase(), platform.arch.displayName.lowercase())
         }
         return resp.body().url
     }
@@ -95,11 +97,11 @@ class BangumiOAuthClient(
     override suspend fun getOAuthBindLink(requestId: String): String {
         require(requestId.isNotBlank()) { "requestId must not be blank or empty" }
 
-        sessionStateProvider.checkAccessBangumiApiNow()
-        check(sessionStateProvider.stateFlow.first() is SessionState.Valid)
+        check(!sessionStateProvider.canAccessBangumiApiNow()) { "Bind operation requires !canAccessBangumiApiNow" }
+        check(sessionStateProvider.canAccessAniApiNow()) { "Bind operation requires canAccessAniApiNow" }
 
         val resp = bangumiApi.invoke {
-            bind(requestId, platform.name, platform.arch.displayName)
+            oauth(requestId, platform.name.lowercase(), platform.arch.displayName.lowercase())
         }
         return resp.body().url
     }

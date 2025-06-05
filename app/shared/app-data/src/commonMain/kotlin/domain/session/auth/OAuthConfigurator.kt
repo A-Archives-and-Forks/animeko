@@ -83,6 +83,7 @@ class OAuthConfigurator(
                 oAuthResult.refreshToken,
             )
         } catch (ex: CancellationException) {
+            _state.value = State.Idle
             throw ex
         } catch (ex: Exception) {
             logger.error(ex) { "OAuth failed, request id: $requestId" }
@@ -110,7 +111,7 @@ class OAuthConfigurator(
         class AwaitingResult(val requestId: String, val deferred: CompletableDeferred<OAuthResult>) : State
         class Success(val requestId: String, val result: OAuthResult) : State
 
-        interface Error : State
+        sealed interface Error : State
         data class UnknownError(val exception: Throwable) : State
 
         class KnownError(val type: ErrorType, val exception: Throwable) : State

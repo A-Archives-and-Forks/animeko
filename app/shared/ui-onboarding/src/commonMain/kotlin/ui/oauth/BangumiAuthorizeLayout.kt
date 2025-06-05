@@ -12,23 +12,21 @@ package me.him188.ani.app.ui.oauth
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.rounded.ArrowOutward
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,12 +36,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.SplitButtonDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -56,14 +51,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import me.him188.ani.app.ui.foundation.IconButton
 import me.him188.ani.app.ui.foundation.animation.AniAnimatedVisibility
 import me.him188.ani.app.ui.foundation.animation.AniMotionScheme
 import me.him188.ani.app.ui.foundation.animation.AnimatedVisibilityMotionScheme
 import me.him188.ani.app.ui.foundation.animation.LocalAniMotionScheme
 import me.him188.ani.app.ui.foundation.icons.BangumiNext
 import me.him188.ani.app.ui.foundation.icons.BangumiNextIconColor
-import me.him188.ani.app.ui.foundation.ifThen
 import me.him188.ani.app.ui.foundation.layout.currentWindowAdaptiveInfo1
 import me.him188.ani.app.ui.foundation.widgets.HeroIcon
 import me.him188.ani.app.ui.onboarding.WizardLayoutParams
@@ -72,8 +65,7 @@ import me.him188.ani.app.ui.settings.framework.components.SettingsScope
 import me.him188.ani.app.ui.settings.framework.components.TextItem
 
 sealed interface AuthState {
-
-    data class LoggedInAni(val username: String) : Idle
+    data class LoggedInAni(val bound: Boolean) : Idle
 
     data object NoAniAccount : Idle
 
@@ -81,7 +73,7 @@ sealed interface AuthState {
 
     data object AwaitingResult : AuthState
 
-    data class Success(val username: String?) : AuthState
+    data object Success : AuthState
 
     data class UnknownError(val cause: Throwable? = null) : Error
 
@@ -97,131 +89,70 @@ sealed interface AuthState {
     }
 }
 
-/**
- * @param onSkip if not null, a "skip" button will be shown, and this callback will be invoked when the button is clicked.
- */
-// this page will be reused.
 @Composable
 fun BangumiAuthorizeLayout(
     authorizeState: AuthState,
-    showTokenAuthorizePage: Boolean,
     contactActions: @Composable () -> Unit,
-    onSetShowTokenAuthorizePage: (Boolean) -> Unit,
     onClickAuthorize: () -> Unit,
     onCancelAuthorize: () -> Unit,
-    onClickNavigateToBangumiDev: () -> Unit,
-    onAuthorizeByToken: (String) -> Unit,
     modifier: Modifier = Modifier,
-    onSkip: (() -> Unit)? = null,
     layoutParams: WizardLayoutParams = WizardLayoutParams.calculate(currentWindowAdaptiveInfo1().windowSizeClass),
 ) {
     SettingsTab(modifier) {
-        AnimatedContent(
-            showTokenAuthorizePage,
-            transitionSpec = LocalAniMotionScheme.current.animatedContent.topLevel,
-        ) { show ->
-            if (!show) {
-                DefaultAuthorize(
-                    authorizeState = authorizeState,
-                    contactActions = contactActions,
-                    onClickAuthorize = onClickAuthorize,
-                    onClickTokenAuthorize = {
-                        onCancelAuthorize()
-                        onSetShowTokenAuthorizePage(true)
-                    },
-                    onSkip = onSkip,
-                    onClickCancelAuthorize = onCancelAuthorize,
-                    layoutParams = layoutParams,
-                )
-            } else {
-                TokenAuthorize(
-                    onClickNavigateToBangumiDev = onClickNavigateToBangumiDev,
-                    onAuthorizeByToken = { token ->
-                        onAuthorizeByToken(token)
-                        onSetShowTokenAuthorizePage(false)
-                    },
-                    layoutParams = layoutParams,
+        val motionScheme = LocalAniMotionScheme.current
+        Column(
+            modifier.scrollable(rememberScrollState(), orientation = Orientation.Vertical),
+            verticalArrangement = Arrangement.spacedBy(SettingsScope.itemVerticalSpacing),
+        ) {
+            HeroIcon {
+                Icon(
+                    imageVector = Icons.Default.BangumiNext,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    tint = BangumiNextIconColor,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun SettingsScope.DefaultAuthorize(
-    authorizeState: AuthState,
-    onClickAuthorize: () -> Unit,
-    onClickTokenAuthorize: () -> Unit,
-    onClickCancelAuthorize: () -> Unit,
-    onSkip: (() -> Unit)?,
-    contactActions: @Composable () -> Unit,
-    layoutParams: WizardLayoutParams,
-    modifier: Modifier = Modifier,
-) {
-    val motionScheme = LocalAniMotionScheme.current
-    Column(
-        modifier,
-        verticalArrangement = Arrangement.spacedBy(SettingsScope.itemVerticalSpacing),
-    ) {
-        HeroIcon {
-            Icon(
-                imageVector = Icons.Default.BangumiNext,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                tint = BangumiNextIconColor,
-            )
-        }
-        Column {
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = layoutParams.horizontalPadding)
-                    .fillMaxWidth(),
-            ) {
-                Text(
-                    "授权 Bangumi 账号，可以同步你的观看记录到 Bangumi 或便捷登录 Ani",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = layoutParams.horizontalPadding)
-                    .padding(top = 24.dp)
-                    .fillMaxWidth(),
-            ) {
-                AuthorizeButton(
-                    authorizeState,
-                    onClick = onClickAuthorize,
-                    onClickCancel = onClickCancelAuthorize,
+            Column {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 720.dp),
-                )
-                onSkip?.let {
-                    TextButton(
-                        onClick = it,
+                        .padding(horizontal = layoutParams.horizontalPadding)
+                        .fillMaxWidth(),
+                ) {
+                    Text(
+                        "授权 Bangumi 账号，可以同步你的观看记录到 Bangumi 或便捷登录 Ani",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = layoutParams.horizontalPadding)
+                        .padding(top = 24.dp)
+                        .fillMaxWidth(),
+                ) {
+                    AuthorizeButton(
+                        authorizeState,
+                        onClick = onClickAuthorize,
+                        onClickCancel = onCancelAuthorize,
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 720.dp),
-                    ) {
-                        Text("跳过")
-                    }
+                    )
+                    AuthorizeStateText(
+                        authorizeState,
+                        modifier = Modifier.padding(
+                            horizontal = layoutParams.descHorizontalPadding,
+                            vertical = 8.dp,
+                        ),
+                        animatedVisibilityMotionScheme = motionScheme.animatedVisibility,
+                    )
                 }
-                AuthorizeStateText(
-                    authorizeState,
-                    modifier = Modifier.padding(
-                        horizontal = layoutParams.descHorizontalPadding,
-                        vertical = 8.dp,
-                    ),
-                    animatedVisibilityMotionScheme = motionScheme.animatedVisibility,
-                )
             }
+            AuthorizeHelpQA(
+                contactActions = contactActions,
+                layoutParams = layoutParams,
+                Modifier.padding(top = 36.dp),
+            )
         }
-        AuthorizeHelpQA(
-            onClickTokenAuthorize = onClickTokenAuthorize,
-            contactActions = contactActions,
-            layoutParams = layoutParams,
-            Modifier.padding(top = 36.dp),
-        )
     }
 }
 
@@ -243,7 +174,11 @@ private fun AuthorizeButton(
                 when (it) {
                     is AuthState.Idle, is AuthState.Error -> {
                         if (authorizeState is AuthState.LoggedInAni) {
-                            Text("绑定 Bangumi 账号")
+                            if (authorizeState.bound) {
+                                Text("不可重复绑定")
+                            } else {
+                                Text("绑定 Bangumi 账号")
+                            }
                         } else {
                             Text("登录 / 注册")
                         }
@@ -275,13 +210,16 @@ private fun AuthorizeButton(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         val awaitingResult = authorizeState is AuthState.AwaitingResult
-        if (authorizeState is AuthState.Success) OutlinedButton(
+        if (authorizeState is AuthState.Success ||
+            (authorizeState is AuthState.LoggedInAni && authorizeState.bound)
+        ) OutlinedButton(
             onClick = onClick,
+            enabled = false,
             modifier = Modifier.weight(1f),
             content = content,
         ) else Button(
             onClick = onClick,
-            enabled = authorizeState !is AuthState.AwaitingResult,
+            enabled = !awaitingResult,
             modifier = Modifier.weight(1f),
             content = content,
             shape = if (awaitingResult) SplitButtonDefaults.leadingButtonShapes().shape else ButtonDefaults.shape,
@@ -314,13 +252,10 @@ private fun AuthorizeStateText(
         modifier = modifier,
     ) {
         Text(
-            remember(authorizeState) {
-                when (authorizeState) {
-                    is AuthState.Success -> "已授权: ${authorizeState.username}"
-                    is AuthState.KnownError -> renderKnownError(authorizeState.type)
-                    is AuthState.UnknownError -> "未知错误：${authorizeState.cause}"
-                    else -> ""
-                }
+            when (authorizeState) {
+                is AuthState.KnownError -> renderKnownError(authorizeState.type)
+                is AuthState.UnknownError -> "未知错误：${authorizeState.cause}"
+                else -> ""
             },
             style = MaterialTheme.typography.bodyMedium,
             color = when (authorizeState) {
@@ -340,7 +275,6 @@ private enum class HelpOption {
     REGISTER_TYPE_WRONG_CAPTCHA,
     CANT_RECEIVE_REGISTER_EMAIL,
     REGISTER_ACTIVATION_FAILED,
-    LOGIN_SUCCESS_NO_RESPONSE,
     OTHERS,
 }
 
@@ -353,7 +287,6 @@ private fun renderHelpOptionTitle(option: HelpOption): String {
         HelpOption.REGISTER_TYPE_WRONG_CAPTCHA -> "注册或登录时一直提示验证码错误"
         HelpOption.CANT_RECEIVE_REGISTER_EMAIL -> "无法收到邮箱验证码"
         HelpOption.REGISTER_ACTIVATION_FAILED -> "注册时一直激活失败"
-        HelpOption.LOGIN_SUCCESS_NO_RESPONSE -> "网页显示登录成功后没有反应"
         HelpOption.OTHERS -> "其他问题"
     }
 }
@@ -368,11 +301,9 @@ private fun renderKnownError(type: AuthState.ErrorType): String {
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun renderHelpOptionContent(
     option: HelpOption,
-    onClickTokenAuthorize: () -> Unit,
     contactActions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -408,31 +339,6 @@ private fun renderHelpOptionContent(
                 Text("删除激活码的最后一个字，然后手动输入删除的字，或更换其他浏览器")
             }
 
-            HelpOption.LOGIN_SUCCESS_NO_RESPONSE -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("可以尝试使用")
-                    TextButton(
-                        onClick = onClickTokenAuthorize,
-                        modifier = Modifier.heightIn(ButtonDefaults.XSmallContainerHeight),
-                        contentPadding = ButtonDefaults.XSmallContentPadding,
-                    ) {
-                        Text(
-                            "令牌登录",
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.size(ButtonDefaults.XSmallIconSpacing))
-                        Icon(
-                            Icons.AutoMirrored.Default.OpenInNew,
-                            contentDescription = "Use token login",
-                            modifier = Modifier.size(ButtonDefaults.XSmallIconSize), // Text size of medium body
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-            }
-
             HelpOption.OTHERS -> {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("无法解决你的问题？还可以通过以下渠道获取帮助")
@@ -445,7 +351,6 @@ private fun renderHelpOptionContent(
 
 @Composable
 private fun SettingsScope.AuthorizeHelpQA(
-    onClickTokenAuthorize: () -> Unit,
     contactActions: @Composable () -> Unit,
     layoutParams: WizardLayoutParams,
     modifier: Modifier = Modifier,
@@ -473,16 +378,7 @@ private fun SettingsScope.AuthorizeHelpQA(
                             fontWeight = if (currentSelected == option) FontWeight.SemiBold else null,
                         )
                     },
-                    content = {
-                        renderHelpOptionContent(
-                            option,
-                            onClickTokenAuthorize,
-                            contactActions,
-                            modifier = Modifier.ifThen(option != HelpOption.LOGIN_SUCCESS_NO_RESPONSE) {
-                                Modifier.padding(vertical = 16.dp)
-                            },
-                        )
-                    },
+                    content = { renderHelpOptionContent(option, contactActions) },
                     expanded = currentSelected == option,
                     showDivider = index != HelpOption.entries.lastIndex,
                     onClick = { currentSelected = if (currentSelected == option) null else option },
@@ -531,87 +427,6 @@ fun SettingsScope.ExpandableHelpItem(
         }
         if (showDivider) {
             HorizontalDivider(modifier = Modifier.padding(horizontal = layoutParams.horizontalPadding))
-        }
-    }
-}
-
-@Composable
-private fun SettingsScope.TokenAuthorize(
-    onClickNavigateToBangumiDev: () -> Unit,
-    onAuthorizeByToken: (String) -> Unit,
-    layoutParams: WizardLayoutParams,
-    modifier: Modifier = Modifier,
-) {
-    var token by rememberSaveable { mutableStateOf("") }
-
-    Group(
-        modifier = modifier,
-        title = { Text("令牌 (token) 登录指南") },
-    ) {
-        TextItem(
-            icon = { TokenAuthorizeStepIcon(1) },
-            title = { Text("登录 Bangumi 开发者后台") },
-            description = { Text("点击跳转到 Bangumi 开发后台，使用邮箱登录") },
-            action = {
-                IconButton(onClickNavigateToBangumiDev) {
-                    Icon(Icons.Rounded.ArrowOutward, null)
-                }
-            },
-            modifier = Modifier.clickable(onClick = onClickNavigateToBangumiDev),
-        )
-        TextItem(
-            icon = { TokenAuthorizeStepIcon(2) },
-            title = { Text("创建令牌 (token)") },
-            description = { Text("任意名称，有效期 365 天") },
-        )
-        TextItem(
-            icon = { TokenAuthorizeStepIcon(3) },
-            title = { Text("复制令牌到下方输入框中") },
-        )
-        Column(
-            modifier = Modifier
-                .padding(horizontal = layoutParams.horizontalPadding, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            OutlinedTextField(
-                value = token,
-                onValueChange = { token = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("令牌 (token)") },
-            )
-            Button(
-                onClick = { onAuthorizeByToken(token) },
-                enabled = token.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 720.dp),
-            ) {
-                Text("授权登录")
-            }
-        }
-    }
-}
-
-// has fixed size
-@Composable
-private fun TokenAuthorizeStepIcon(
-    step: Int
-) {
-    Surface(
-        modifier = Modifier.size(36.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        shape = CircleShape,
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = step.toString(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
         }
     }
 }
