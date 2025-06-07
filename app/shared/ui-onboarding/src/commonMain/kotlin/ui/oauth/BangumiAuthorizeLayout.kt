@@ -84,7 +84,6 @@ sealed interface AuthState {
     enum class ErrorType {
         NotSupportedForRegistration,
         InvalidBangumiToken,
-        AlreadyBound,
         NetworkError
     }
 }
@@ -296,7 +295,6 @@ private fun renderKnownError(type: AuthState.ErrorType): String {
     return when (type) {
         AuthState.ErrorType.NotSupportedForRegistration -> "此 oAuth 方式不支持注册 Ani 账号，请使用其他方式注册"
         AuthState.ErrorType.InvalidBangumiToken -> "无效的 Bangumi 令牌 (token)"
-        AuthState.ErrorType.AlreadyBound -> "该 Bangumi 账号已经绑定了其他的 Ani 账号"
         AuthState.ErrorType.NetworkError -> "网络错误，请稍后再试"
     }
 }

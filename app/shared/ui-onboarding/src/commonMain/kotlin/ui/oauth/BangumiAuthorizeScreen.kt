@@ -37,7 +37,7 @@ fun BangumiAuthorizeScreen(
         onClickAuthorize = {
             scope.launch {
                 val currentState = state
-                if (currentState !is AuthState.Idle ||
+                if (currentState is AuthState.AwaitingResult ||
                     (currentState is AuthState.LoggedInAni && currentState.bound)
                 ) return@launch
 

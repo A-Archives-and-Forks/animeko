@@ -92,7 +92,6 @@ private fun OAuthConfigurator.State.ErrorType.toUIErrorType(): AuthState.ErrorTy
     return when (this) {
         OAuthConfigurator.State.ErrorType.NotSupportedForRegistration -> AuthState.ErrorType.NotSupportedForRegistration
         OAuthConfigurator.State.ErrorType.InvalidBangumiToken -> AuthState.ErrorType.InvalidBangumiToken
-        OAuthConfigurator.State.ErrorType.AlreadyBound -> AuthState.ErrorType.AlreadyBound
         OAuthConfigurator.State.ErrorType.NetworkError -> AuthState.ErrorType.NetworkError
     }
 }

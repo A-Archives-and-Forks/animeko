@@ -89,9 +89,6 @@ class OAuthConfigurator(
             logger.error(ex) { "OAuth failed, request id: $requestId" }
 
             when (ex) {
-                is AlreadyBoundException ->
-                    _state.value = State.KnownError(State.ErrorType.AlreadyBound, ex)
-
                 is InvalidTokenException ->
                     _state.value = State.KnownError(State.ErrorType.InvalidBangumiToken, ex)
 
@@ -119,7 +116,6 @@ class OAuthConfigurator(
         enum class ErrorType {
             NotSupportedForRegistration, // 不支持注册
             InvalidBangumiToken,
-            AlreadyBound, // 已经绑定了其他的 Ani 账号
             NetworkError,
         }
     }

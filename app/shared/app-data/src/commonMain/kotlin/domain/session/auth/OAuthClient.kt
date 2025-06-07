@@ -74,11 +74,6 @@ sealed class OAuthException : Exception()
  */
 class InvalidTokenException(override val message: String? = null) : OAuthException()
 
-/**
- * 当登录的 Bangumi 账号已经绑定了其他的 Ani 账号时抛出此异常.
- */
-class AlreadyBoundException(override val message: String? = null) : OAuthException()
-
 class BangumiOAuthClient(
     private val bangumiApi: ApiInvoker<BangumiAniApi>,
     private val sessionStateProvider: SessionStateProvider,
@@ -101,7 +96,7 @@ class BangumiOAuthClient(
         check(sessionStateProvider.canAccessAniApiNow()) { "Bind operation requires canAccessAniApiNow" }
 
         val resp = bangumiApi.invoke {
-            oauth(requestId, platform.name.lowercase(), platform.arch.displayName.lowercase())
+            bind(requestId, platform.name.lowercase(), platform.arch.displayName.lowercase())
         }
         return resp.body().url
     }
@@ -128,7 +123,6 @@ class BangumiOAuthClient(
             when (ex.response.status) {
                 HttpStatusCode.TooEarly -> return null
                 HttpStatusCode.BadRequest -> throw InvalidTokenException(ex.response.bodyAsText())
-                HttpStatusCode.Conflict -> throw AlreadyBoundException(ex.response.bodyAsText())
                 else -> throw ex
             }
         }
