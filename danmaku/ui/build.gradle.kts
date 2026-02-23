@@ -35,4 +35,7 @@ kotlin {
         implementation(libs.compose.material3.adaptive.core)
         // Preview only
     }
+    sourceSets.commonTest.dependencies {
+        implementation(projects.utils.uiTesting)
+    }
 }
