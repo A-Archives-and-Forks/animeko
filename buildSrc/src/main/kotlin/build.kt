@@ -129,7 +129,7 @@ private fun Project.versionCatalogLibs(): VersionCatalog =
 
 private operator fun VersionCatalog.get(name: String): String = findVersion(name).get().displayName
 
-private fun VersionCatalog.getLibrary(name: String): String = findLibrary(name).getOrNull()?.orNull?.toString()
+fun VersionCatalog.getLibrary(name: String): String = findLibrary(name).getOrNull()?.orNull?.toString()
     ?: error("Library $name not found in version catalog")
 
 private fun Project.kotlinCommonCompilerOptions(): KotlinCommonCompilerOptions = when (val ext = kotlinExtension) {

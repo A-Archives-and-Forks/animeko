@@ -137,15 +137,13 @@ configure<KotlinMultiplatformExtension> {
         // 添加常用依赖
         if (composeExtension != null) {
             // Compose
-            api("org.jetbrains.compose.foundation:foundation:${composeMultiplatformVersion}")
-            api("org.jetbrains.compose.animation:animation:${composeMultiplatformVersion}")
-            api("org.jetbrains.compose.ui:ui:${composeMultiplatformVersion}")
-
-            api("org.jetbrains.compose.material3:material3:${libs.findVersion("compose-material3").get()}")
-            api("org.jetbrains.androidx.window:window-core:${libs.findVersion("compose-window-core").get()}")
-
-            api("org.jetbrains.compose.material:material-icons-extended:1.7.3")
-            api("org.jetbrains.compose.runtime:runtime:${composeMultiplatformVersion}")
+            api(libs.getLibrary("compose-foundation"))
+            api(libs.getLibrary("compose-runtime"))
+            api(libs.getLibrary("compose-ui"))
+            api(libs.getLibrary("compose-animation"))
+            api(libs.getLibrary("compose-material3"))
+            api(libs.getLibrary("compose-material-icons-extended"))
+            api(libs.getLibrary("compose-window-core"))
         }
 
         if (project.path != ":utils:platform") {
@@ -155,15 +153,14 @@ configure<KotlinMultiplatformExtension> {
     sourceSets.commonTest.dependencies {
         // https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-test.html#writing-and-running-tests-with-compose-multiplatform
         if (composeExtension != null) {
-            implementation("org.jetbrains.compose.ui:ui-test:${composeMultiplatformVersion}")
+            implementation(libs.getLibrary("compose-ui-test"))
         }
         implementation(project(":utils:testing"))
     }
 
     if (composeExtension != null) {
         sourceSets.getByName("desktopMain").dependencies {
-            val compose = ComposePlugin.Dependencies(project)
-            implementation("org.jetbrains.compose.ui:ui-test-junit4:${composeMultiplatformVersion}")
+            implementation(libs.getLibrary("compose-ui-test-junit4"))
         }
     }
 
@@ -182,11 +179,9 @@ configure<KotlinMultiplatformExtension> {
             }
             tasks.withType(KotlinCompilationTask::class) {
                 mustRunAfter(tasks.matching { it.name == "generateComposeResClass" })
-                mustRunAfter(tasks.matching { it.name == "generateResourceAccessorsForAndroidRelease" })
+                mustRunAfter(tasks.matching { it.name == "generateResourceAccessorsForAndroidMain" })
                 mustRunAfter(tasks.matching { it.name == "generateResourceAccessorsForAndroidHostTest" })
-                mustRunAfter(tasks.matching { it.name == "generateResourceAccessorsForAndroidHostTestRelease" })
-                mustRunAfter(tasks.matching { it.name == "generateResourceAccessorsForAndroidHostTestDebug" })
-                mustRunAfter(tasks.matching { it.name == "generateResourceAccessorsForAndroidDebug" })
+                mustRunAfter(tasks.matching { it.name == "generateResourceAccessorsForAndroidDeviceTest" })
             }
 
             val composeVersion = versionCatalogs.named("libs").findVersion("jetpack-compose").get()
@@ -203,7 +198,7 @@ configure<KotlinMultiplatformExtension> {
             }
 
             project.dependencies {
-                "androidRuntimeClasspath"("androidx.compose.ui:ui-test-manifest:${composeVersion}")
+                "androidRuntimeClasspath"(libs.getLibrary("androidx-compose-ui-test-manifest"))
             }
         }
     }

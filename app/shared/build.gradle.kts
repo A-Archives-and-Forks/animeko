@@ -132,7 +132,7 @@ kotlin {
     }
 
     // shared by android and desktop
-    sourceSets.getByName("jvmMain").dependencies {
+    sourceSets.jvmMain.dependencies {
         // TODO: to be commonized
         api(projects.datasource.dmhy)
         api(projects.datasource.jellyfin)
@@ -144,14 +144,6 @@ kotlin {
     }
 
     sourceSets.commonTest.dependencies {
-        implementation(libs.kotlinx.coroutines.test)
-        implementation(projects.utils.testing)
-        implementation(projects.utils.uiTesting)
-        implementation(libs.turbine)
-    }
-
-    // androidUnitTest is apart from the commonTest tree so we have to do it again
-    sourceSets.androidHostTest.dependencies {
         implementation(libs.kotlinx.coroutines.test)
         implementation(projects.utils.testing)
         implementation(projects.utils.uiTesting)
@@ -174,7 +166,12 @@ kotlin {
         api(projects.utils.buildConfig)
     }
 
+    // androidUnitTest is apart from the commonTest tree so we have to do it again
     sourceSets.androidHostTest.dependencies {
+        implementation(libs.kotlinx.coroutines.test)
+        implementation(projects.utils.testing)
+        implementation(projects.utils.uiTesting)
+        implementation(libs.turbine)
         implementation(libs.mockito)
         implementation(libs.mockito.kotlin)
         implementation(libs.koin.test)
@@ -184,12 +181,12 @@ kotlin {
         implementation(libs.stately.common) // fixes koin bug
     }
 
-    sourceSets.named("desktopMain").dependencies {
+    sourceSets.desktopMain.dependencies {
         api(compose.desktop.currentOs) {
             exclude("org.jetbrains.compose.material:material") // We use material3
             exclude("org.jetbrains.compose.ui:ui-tooling-preview")
         }
-        api("org.jetbrains.compose.ui:ui-graphics-desktop:${libs.versions.compose.multiplatform.get()}")
+        api(libs.compose.ui.graphics.desktop)
         api(projects.utils.logging)
         api(libs.kotlinx.coroutines.swing)
         implementation(libs.vlcj)
