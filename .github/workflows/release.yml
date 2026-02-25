@@ -211,6 +211,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: true
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadDesktopInstallers "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g -Dkotlin.daemon.jvm.options=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=x86_64"'
@@ -227,6 +230,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: false
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadDesktopInstallers "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g -Dkotlin.daemon.jvm.options=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=x86_64"'
@@ -537,6 +543,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: true
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadIosIpa "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx12g -Dkotlin.daemon.jvm.options=-Xmx20g" "-Dkotlin.daemon.jvm.options=-Xmx20g" "--parallel"'
@@ -553,11 +562,33 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: false
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadIosIpa "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx12g -Dkotlin.daemon.jvm.options=-Xmx20g" "-Dkotlin.daemon.jvm.options=-Xmx20g" "--parallel"'
         if: '${{ steps.step-36.outcome == ''failure'' }}'
       - id: 'step-38'
+        name: 'Upload AppStore Testflight (Attempt #1)'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GITHUB_REPOSITORY: '${{ secrets.GITHUB_REPOSITORY }}'
+          CI_RELEASE_ID: '${{ needs.create-release.outputs.id }}'
+          CI_TAG: '${{ steps.step-1.outputs.tag }}'
+          UPLOAD_TO_S3: 'true'
+          AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
+          AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+          AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
+          AWS_REGION: '${{ secrets.AWS_REGION }}'
+          AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
+        continue-on-error: false
+        timeout-minutes: 180
+        run: './gradlew :ci-helper:uploadAppStoreConnectTestflight "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx12g -Dkotlin.daemon.jvm.options=-Xmx20g" "-Dkotlin.daemon.jvm.options=-Xmx20g" "--parallel"'
+      - id: 'step-39'
         name: 'Cleanup temp files'
         continue-on-error: true
         run: 'chmod +x ./ci-helper/cleanup-temp-files-macos.sh && ./ci-helper/cleanup-temp-files-macos.sh'
@@ -760,6 +791,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: true
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadDesktopInstallers "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g -Dkotlin.daemon.jvm.options=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a"'
@@ -776,6 +810,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: false
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadDesktopInstallers "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g -Dkotlin.daemon.jvm.options=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a"'
@@ -986,6 +1023,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: true
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadDesktopInstallers "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx6g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g" "-Pani.android.abis=arm64-v8a"'
@@ -1002,6 +1042,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: false
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadDesktopInstallers "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx6g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g" "-Pani.android.abis=arm64-v8a"'
@@ -1417,6 +1460,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: true
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadAndroidApk "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g"'
@@ -1433,6 +1479,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: false
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadAndroidApk "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g"'
@@ -1462,6 +1511,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: true
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadAndroidApkQR "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g"'
@@ -1478,6 +1530,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: false
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadAndroidApkQR "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g"'
@@ -1507,6 +1562,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: true
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadIosIpaQR "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g"'
@@ -1523,6 +1581,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: false
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadIosIpaQR "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g"'
@@ -1609,6 +1670,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: true
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadDesktopInstallers "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g"'
@@ -1625,6 +1689,9 @@ jobs:
           AWS_BASEURL: '${{ secrets.AWS_BASEURL }}'
           AWS_REGION: '${{ secrets.AWS_REGION }}'
           AWS_BUCKET: '${{ secrets.AWS_BUCKET }}'
+          APPSTORE_API_KEY_ID: '${{ secrets.APPSTORE_API_KEY_ID }}'
+          APPSTORE_API_PRIVATE_KEY: '${{ secrets.APPSTORE_API_PRIVATE_KEY }}'
+          APPSTORE_ISSUER_ID: '${{ secrets.APPSTORE_ISSUER_ID }}'
         continue-on-error: false
         timeout-minutes: 180
         run: './gradlew :ci-helper:uploadDesktopInstallers "--no-configuration-cache" "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g"'

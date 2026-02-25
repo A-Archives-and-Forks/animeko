@@ -21,6 +21,7 @@ import io.ktor.http.contentType
 import io.ktor.util.cio.readChannel
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.internal.impldep.com.amazonaws.auth.AWSStaticCredentialsProvider
 import org.gradle.internal.impldep.com.amazonaws.auth.BasicAWSCredentials
@@ -29,6 +30,9 @@ import org.gradle.internal.impldep.com.amazonaws.services.s3.AmazonS3ClientBuild
 import org.gradle.internal.impldep.com.amazonaws.services.s3.model.ObjectMetadata
 import org.gradle.internal.impldep.com.amazonaws.services.s3.model.PutObjectRequest
 import java.security.MessageDigest
+import kotlin.concurrent.thread
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -146,22 +150,6 @@ class ReleaseEnvironment {
     val token by lazy {
         getProperty("GITHUB_TOKEN").also { println("token = ${it.isNotEmpty()}") }
     }
-
-    fun uploadReleaseAsset(
-        name: String,
-        contentType: String,
-        file: File,
-    ) {
-        check(file.exists()) { "File '${file.absolutePath}' does not exist when attempting to upload '$name'." }
-        val tag = getProperty("CI_TAG")
-        val fullVersion = namer.getFullVersionFromTag(tag)
-        val releaseId = getProperty("CI_RELEASE_ID")
-        val repository = getProperty("GITHUB_REPOSITORY")
-        val token = getProperty("GITHUB_TOKEN")
-        println("tag = $tag")
-        return uploadReleaseAsset(repository, releaseId, token, fullVersion, name, contentType, file)
-    }
-
     private val s3Client by lazy {
         AmazonS3ClientBuilder
             .standard()
@@ -182,6 +170,21 @@ class ReleaseEnvironment {
                 )
             }
             .build()
+    }
+
+    fun uploadReleaseAsset(
+        name: String,
+        contentType: String,
+        file: File,
+    ) {
+        check(file.exists()) { "File '${file.absolutePath}' does not exist when attempting to upload '$name'." }
+        val tag = getProperty("CI_TAG")
+        val fullVersion = namer.getFullVersionFromTag(tag)
+        val releaseId = getProperty("CI_RELEASE_ID")
+        val repository = getProperty("GITHUB_REPOSITORY")
+        val token = getProperty("GITHUB_TOKEN")
+        println("tag = $tag")
+        return uploadReleaseAsset(repository, releaseId, token, fullVersion, name, contentType, file)
     }
 
     fun uploadReleaseAsset(
@@ -278,6 +281,108 @@ class ReleaseEnvironment {
                 // Propagate other errors
                 throw e
             }
+        }
+    }
+
+    /*suspend fun uploadReleaseNotesToAppStoreConnect(
+        client: HttpClient,
+    ): Boolean {
+        return try {
+            client.post("https://uploads.github.com/repos/$repository/releases/$releaseId/assets") {
+                header("Authorization", "Bearer $token")
+                header("Accept", "application/vnd.github+json")
+                parameter("name", fileName)
+
+                contentType(contentType)
+                setBody(
+                    object : OutgoingContent.ReadChannelContent() {
+                        override val contentType: ContentType
+                            get() = contentType
+                        override val contentLength: Long
+                            get() = file.length()
+
+                        override fun readFrom(): ByteReadChannel = file.readChannel()
+                    },
+                )
+            }
+
+            // If we made it here, the upload is successful
+            true
+        } catch (e: ClientRequestException) {
+            // Check for the 422 "already exists" error
+            if (e.response.status.value == 422) {
+                println("Asset already exists: $fileName")
+                false
+            } else {
+                // Propagate other errors
+                throw e
+            }
+        }
+    }*/
+
+    suspend fun uploadIosAppStoreConnectTestflight(
+        apiKeyId: String,
+        apiPrivateKey: String,
+        apiIssuerId: String,
+        file: File,
+    ): Boolean {
+        var secKeyFile: File? = null
+        return try {
+            val secKeyDir = getProperty("HOME")
+                .ifEmpty { throw IllegalStateException("Environment property HOME is empty.") }
+                .let { File(it).resolve("private_keys") }
+                .apply { mkdirs() }
+
+            secKeyFile = secKeyDir.resolve("AuthKey_${apiKeyId}.p8").apply {
+                createNewFile()
+                // write private keys to specific file
+                writeText(apiPrivateKey)
+            }
+
+            suspendCancellableCoroutine { cont ->
+                val job = thread(start = false) {
+                    try {
+                        val result = ProcessBuilder().apply {
+                            directory(layout.buildDirectory.get().asFile)
+                            command(
+                                listOf(
+                                    "xcrun",
+                                    "iTMSTransporter",
+                                    "-m", "upload",
+                                    "-assetFile", file.absolutePath,
+                                    "-apiKey", apiKeyId,
+                                    "-apiIssuer", apiIssuerId,
+                                    "-appPlatform", "ios",
+                                    "-v",
+                                    "eXtreme",
+                                ),
+                            )
+                            inheritIO()
+                        }.start().waitFor()
+
+                        if (result != 0) {
+                            cont.resumeWithException(
+                                IllegalStateException("iTMSTransporter terminated with code $result"),
+                            )
+                        } else {
+                            cont.resume(Unit)
+                        }
+                    } catch (e: InterruptedException) {
+                        throw e
+                    } catch (e: Exception) {
+                        cont.resumeWithException(e)
+                    }
+                }
+                cont.invokeOnCancellation { job.interrupt() }
+                job.start()
+            }
+
+            true
+        } catch (e: Exception) {
+            println("Failed to upload IPA assets to Apple Store Connect: $e")
+            false
+        } finally {
+            secKeyFile?.delete()
         }
     }
 
@@ -399,6 +504,26 @@ class ReleaseEnvironment {
             file = file,
         )
     }
+
+    fun uploadAppStoreConnectTestflight(file: File) {
+        check(file.exists()) { "File '${file.absolutePath}' does not exist when attempting to upload '$name'." }
+        val tag = getProperty("CI_TAG")
+        val fullVersion = namer.getFullVersionFromTag(tag)
+        val apiKeyId = getProperty("APPSTORE_API_KEY_ID")
+        val apiPrivateKey = getProperty("APPSTORE_API_PRIVATE_KEY")
+        val issuerId = getProperty("APPSTORE_ISSUER_ID")
+
+        println("tag = $tag")
+
+        runBlocking {
+            uploadIosAppStoreConnectTestflight(
+                apiKeyId = apiKeyId,
+                apiPrivateKey = apiPrivateKey,
+                apiIssuerId = issuerId,
+                file = file,
+            )
+        }
+    }
 }
 
 val releaseEnvironment = ReleaseEnvironment()
@@ -484,6 +609,14 @@ tasks.register("uploadIosIpa") {
     val file = project(":app:ios").tasks.getByPath("buildReleaseIpa").outputs.files.singleFile
     doLast {
         releaseEnvironment.uploadIpa(file)
+    }
+}
+
+tasks.register("uploadAppStoreConnectTestflight") {
+    dependsOn(":app:ios:buildReleaseIpa")
+    val file = project(":app:ios").tasks.getByPath("buildReleaseIpa").outputs.files.singleFile
+    doLast {
+        releaseEnvironment.uploadAppStoreConnectTestflight(file)
     }
 }
 

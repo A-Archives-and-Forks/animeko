@@ -36,6 +36,9 @@
 @file:DependsOn("softprops:action-gh-release:v1")
 @file:DependsOn("snow-actions:qrcode:v1.0.0")
 
+import Secrets.APPSTORE_API_KEY_ID
+import Secrets.APPSTORE_API_PRIVATE_KEY
+import Secrets.APPSTORE_ISSUER_ID
 import Secrets.AWS_ACCESS_KEY_ID
 import Secrets.AWS_BASEURL
 import Secrets.AWS_BUCKET
@@ -938,6 +941,7 @@ workflow(
                     buildIosIpaRelease()
                 }
                 uploadIosIpa()
+                uploadAppStoreConnectTestflight()
                 uploadComposeLogs()
             }
             cleanupTempFiles()
@@ -957,6 +961,22 @@ workflow(
         addJob(matrix)
     }
 }
+/*
+workflow(
+    name = "Testflight",
+    permissions = mapOf(
+        Permission.Actions to Mode.Write,
+        Permission.Contents to Mode.Write, // Releases
+    ),
+    on = listOf(
+        Release(),
+    ),
+    sourceFile = __FILE__,
+    targetFileName = "testflight.yml",
+    consistencyCheckJobConfig = ConsistencyCheckJobConfig.Disabled,
+) {
+
+}*/
 
 data class GitTag(
     /**
@@ -1738,6 +1758,9 @@ class WithMatrix(
             "AWS_BASEURL" to expr { secrets.AWS_BASEURL },
             "AWS_REGION" to expr { secrets.AWS_REGION },
             "AWS_BUCKET" to expr { secrets.AWS_BUCKET },
+            "APPSTORE_API_KEY_ID" to expr { secrets.APPSTORE_API_KEY_ID },
+            "APPSTORE_API_PRIVATE_KEY" to expr { secrets.APPSTORE_API_PRIVATE_KEY },
+            "APPSTORE_ISSUER_ID" to expr { secrets.APPSTORE_ISSUER_ID },
         )
 
         fun JobBuilder<*>.uploadAndroidApkToCloud() {
@@ -1818,6 +1841,17 @@ class WithMatrix(
                 )
             }
         }
+
+        fun JobBuilder<*>.uploadAppStoreConnectTestflight() {
+            if (matrix.uploadIpa) {
+                runGradle(
+                    name = "Upload AppStore Testflight",
+                    tasks = arrayOf(":ci-helper:uploadAppStoreConnectTestflight", "\"--no-configuration-cache\""),
+                    env = ciHelperSecrets,
+                    maxAttempts = 1,
+                )
+            }
+        }
     }
 }
 
@@ -1844,6 +1878,9 @@ object Secrets {
     val SecretsContext.GOOGLE_SERVICES_JSON by SecretsContext.propertyToExprPath
     val SecretsContext.FIREBASE_GA_APP_ID by SecretsContext.propertyToExprPath
     val SecretsContext.FIREBASE_GA_API_SECRET by SecretsContext.propertyToExprPath
+    val SecretsContext.APPSTORE_API_KEY_ID by SecretsContext.propertyToExprPath
+    val SecretsContext.APPSTORE_API_PRIVATE_KEY by SecretsContext.propertyToExprPath
+    val SecretsContext.APPSTORE_ISSUER_ID by SecretsContext.propertyToExprPath
 }
 
 /// EXTENSIONS
