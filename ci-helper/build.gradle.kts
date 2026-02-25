@@ -21,7 +21,6 @@ import io.ktor.http.contentType
 import io.ktor.util.cio.readChannel
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.suspendCancellableCoroutine
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.internal.impldep.com.amazonaws.auth.AWSStaticCredentialsProvider
 import org.gradle.internal.impldep.com.amazonaws.auth.BasicAWSCredentials
@@ -29,10 +28,8 @@ import org.gradle.internal.impldep.com.amazonaws.client.builder.AwsClientBuilder
 import org.gradle.internal.impldep.com.amazonaws.services.s3.AmazonS3ClientBuilder
 import org.gradle.internal.impldep.com.amazonaws.services.s3.model.ObjectMetadata
 import org.gradle.internal.impldep.com.amazonaws.services.s3.model.PutObjectRequest
+import org.jetbrains.kotlin.gradle.plugin.extraProperties
 import java.security.MessageDigest
-import kotlin.concurrent.thread
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -320,69 +317,15 @@ class ReleaseEnvironment {
         }
     }*/
 
-    suspend fun uploadIosAppStoreConnectTestflight(
-        apiKeyId: String,
-        apiPrivateKey: String,
-        apiIssuerId: String,
-        file: File,
-    ): Boolean {
-        var secKeyFile: File? = null
-        return try {
-            val secKeyDir = getProperty("HOME")
-                .ifEmpty { throw IllegalStateException("Environment property HOME is empty.") }
-                .let { File(it).resolve("private_keys") }
-                .apply { mkdirs() }
+    fun prepareAppStoreConnectKey(apiKeyId: String, apiPrivateKey: String): File {
+        val secKeyDir = getProperty("HOME")
+            .ifEmpty { throw IllegalStateException("Environment property HOME is empty.") }
+            .let { File(it).resolve("private_keys") }
+            .apply { mkdirs() }
 
-            secKeyFile = secKeyDir.resolve("AuthKey_${apiKeyId}.p8").apply {
-                createNewFile()
-                // write private keys to specific file
-                writeText(apiPrivateKey)
-            }
-
-            suspendCancellableCoroutine { cont ->
-                val job = thread(start = false) {
-                    try {
-                        val result = ProcessBuilder().apply {
-                            directory(layout.buildDirectory.get().asFile)
-                            command(
-                                listOf(
-                                    "xcrun",
-                                    "iTMSTransporter",
-                                    "-m", "upload",
-                                    "-assetFile", file.absolutePath,
-                                    "-apiKey", apiKeyId,
-                                    "-apiIssuer", apiIssuerId,
-                                    "-appPlatform", "ios",
-                                    "-v",
-                                    "eXtreme",
-                                ),
-                            )
-                            inheritIO()
-                        }.start().waitFor()
-
-                        if (result != 0) {
-                            cont.resumeWithException(
-                                IllegalStateException("iTMSTransporter terminated with code $result"),
-                            )
-                        } else {
-                            cont.resume(Unit)
-                        }
-                    } catch (e: InterruptedException) {
-                        throw e
-                    } catch (e: Exception) {
-                        cont.resumeWithException(e)
-                    }
-                }
-                cont.invokeOnCancellation { job.interrupt() }
-                job.start()
-            }
-
-            true
-        } catch (e: Exception) {
-            println("Failed to upload IPA assets to Apple Store Connect: $e")
-            false
-        } finally {
-            secKeyFile?.delete()
+        return secKeyDir.resolve("AuthKey_${apiKeyId}.p8").apply {
+            createNewFile()
+            writeText(apiPrivateKey)
         }
     }
 
@@ -505,25 +448,6 @@ class ReleaseEnvironment {
         )
     }
 
-    fun uploadAppStoreConnectTestflight(file: File) {
-        check(file.exists()) { "File '${file.absolutePath}' does not exist when attempting to upload '$name'." }
-        val tag = getProperty("CI_TAG")
-        val fullVersion = namer.getFullVersionFromTag(tag)
-        val apiKeyId = getProperty("APPSTORE_API_KEY_ID")
-        val apiPrivateKey = getProperty("APPSTORE_API_PRIVATE_KEY")
-        val issuerId = getProperty("APPSTORE_ISSUER_ID")
-
-        println("tag = $tag")
-
-        runBlocking {
-            uploadIosAppStoreConnectTestflight(
-                apiKeyId = apiKeyId,
-                apiPrivateKey = apiPrivateKey,
-                apiIssuerId = issuerId,
-                file = file,
-            )
-        }
-    }
 }
 
 val releaseEnvironment = ReleaseEnvironment()
@@ -612,11 +536,36 @@ tasks.register("uploadIosIpa") {
     }
 }
 
-tasks.register("uploadAppStoreConnectTestflight") {
-    dependsOn(":app:ios:buildReleaseIpa")
-    val file = project(":app:ios").tasks.getByPath("buildReleaseIpa").outputs.files.singleFile
+val prepareAppStoreConnectKey: TaskProvider<Task> = tasks.register("prepareAppStoreConnectKey") {
     doLast {
-        releaseEnvironment.uploadAppStoreConnectTestflight(file)
+        val apiKeyId = releaseEnvironment.run { getProperty("APPSTORE_API_KEY_ID") }
+        val apiPrivateKey = releaseEnvironment.run { getProperty("APPSTORE_API_PRIVATE_KEY") }
+        val keyFile = releaseEnvironment.prepareAppStoreConnectKey(apiKeyId, apiPrivateKey)
+        ext.set("secKeyFile", keyFile)
+    }
+}
+
+tasks.register("uploadAppStoreConnectTestflight", Exec::class) {
+    dependsOn(":app:ios:buildReleaseIpa", prepareAppStoreConnectKey)
+    val ipaFile = project(":app:ios").tasks.getByPath("buildReleaseIpa").outputs.files.singleFile
+
+    val apiKeyId = providers.provider { releaseEnvironment.run { getProperty("APPSTORE_API_KEY_ID") } }.get()
+    val apiIssuerId = providers.provider { releaseEnvironment.run { getProperty("APPSTORE_ISSUER_ID") } }.get()
+
+    workingDir = layout.buildDirectory.get().asFile
+    commandLine(
+        "xcrun", "iTMSTransporter",
+        "-m", "upload",
+        "-assetFile", ipaFile.absolutePath,
+        "-apiKey", apiKeyId,
+        "-apiIssuer", apiIssuerId,
+        "-appPlatform", "ios",
+        "-v", "eXtreme",
+    )
+
+    doLast {
+        val keyFile = prepareAppStoreConnectKey.get().extraProperties.get("secKeyFile") as? File
+        keyFile?.delete()
     }
 }
 
