@@ -34,9 +34,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -111,9 +111,11 @@ open class KtorHttpDownloader(
     override val progressFlow: Flow<DownloadProgress> = _progressFlow.asSharedFlow()
 
     override fun getProgressFlow(downloadId: DownloadId): Flow<DownloadProgress> {
-        return progressFlow.filter { it.downloadId == downloadId }.onStart {
-            emit(createProgress(getState(downloadId) ?: return@onStart))
-        }
+        return downloadStatesFlow
+            .mapNotNull { states ->
+                states.firstOrNull { it.downloadId == downloadId }?.let(::createProgress)
+            }
+            .distinctUntilChanged()
     }
 
     /**

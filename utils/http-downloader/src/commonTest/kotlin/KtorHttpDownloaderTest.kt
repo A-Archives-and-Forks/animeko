@@ -19,6 +19,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.core.readAvailable
+import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,6 +27,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestDispatcher
@@ -689,6 +691,64 @@ class KtorHttpDownloaderTest {
             assertEquals(DownloadStatus.COMPLETED, last.status)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `getProgressFlow - should reflect latest state without explicit progress emission`() = testScope.runTest {
+        val stateAwareDownloader = object : KtorHttpDownloader(
+            client = mockClient.asScopedHttpClient(),
+            fileSystem = fileSystem,
+            clock = mockClock,
+            baseSaveDir = Path(tempDir),
+            parentScope = CoroutineScope(SupervisorJob() + testDispatcher),
+            ioDispatcher = testDispatcher,
+        ) {
+            override suspend fun executeFfmpeg(args: List<String>): FFmpegResult = FFmpegResult(exitCode = 0)
+
+            suspend fun seedState(downloadId: DownloadId, status: DownloadStatus) {
+                val state = DownloadState(
+                    downloadId = downloadId,
+                    url = "https://example.com/sample.mp4",
+                    relativeOutputPath = "${downloadId.value}.mp4",
+                    segments = emptyList(),
+                    totalSegments = 0,
+                    downloadedBytes = 0L,
+                    timestamp = 0L,
+                    status = status,
+                    relativeSegmentCacheDir = "segments_${downloadId.value}",
+                    requestHeaders = emptyMap(),
+                    mediaType = MediaType.MP4,
+                )
+                stateMutex.withLock {
+                    _downloadStatesFlow.value = persistentMapOf(
+                        downloadId to DownloadEntry(job = null, state = state),
+                    )
+                }
+            }
+
+            suspend fun forceStatus(downloadId: DownloadId, status: DownloadStatus) {
+                stateMutex.withLock {
+                    val entry = _downloadStatesFlow.value[downloadId] ?: error("Missing state for $downloadId")
+                    _downloadStatesFlow.value = _downloadStatesFlow.value.put(
+                        downloadId,
+                        entry.copy(state = entry.state.copy(status = status)),
+                    )
+                }
+            }
+        }
+        val downloadId = DownloadId("state-only")
+        stateAwareDownloader.seedState(downloadId, DownloadStatus.PAUSED)
+
+        stateAwareDownloader.getProgressFlow(downloadId).test {
+            assertEquals(DownloadStatus.PAUSED, awaitItem().status)
+
+            stateAwareDownloader.forceStatus(downloadId, DownloadStatus.COMPLETED)
+
+            assertEquals(DownloadStatus.COMPLETED, awaitItem().status)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        stateAwareDownloader.close()
     }
 
     // ----------------------------------------------------
