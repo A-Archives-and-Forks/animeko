@@ -23,7 +23,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import me.him188.ani.app.data.models.preference.ThemeSettings
 import me.him188.ani.app.data.network.AniApiProvider
 import me.him188.ani.app.data.network.AniEpisodeCommentService
 import me.him188.ani.app.data.network.AniSubjectRelationIndexService
@@ -531,18 +530,7 @@ fun KoinApplication.startCommonKoinModule(
         val subscriptionUpdater = koin.get<MediaSourceSubscriptionUpdater>()
         while (currentCoroutineContext().isActive) {
             val nextDelay = subscriptionUpdater.updateAllOutdated()
-            delay(nextDelay.coerceAtLeast(1.minutes))
-        }
-    }
-
-    coroutineScope.launch {
-        // TODO: 这里是自动删除旧版数据源. 在未来 3.14 左右就可以去除这个了
-        val removedFactoryIds = setOf("ntdm", "mxdongman", "nyafun", "gugufan", "xfdm", "acg.rip")
-        val manager = koin.get<MediaSourceInstanceRepository>()
-        for (instance in manager.flow.first()) {
-            if (instance.factoryId.value in removedFactoryIds) {
-                manager.remove(instanceId = instance.instanceId)
-            }
+            delay(nextDelay.coerceAtLeast(10.minutes))
         }
     }
 
@@ -558,25 +546,6 @@ fun KoinApplication.startCommonKoinModule(
     coroutineScope.launch {
         val peerFilterRepo = koin.get<PeerFilterSubscriptionRepository>()
         peerFilterRepo.updateOrLoadAll()
-    }
-
-    // TODO: For ThemeSettings migration. Delete in the future.
-    @Suppress("DEPRECATION")
-    coroutineScope.launch {
-        val settingsRepository = koin.get<SettingsRepository>()
-        val uiSettings = settingsRepository.uiSettings
-        val uiSettingsContent = uiSettings.flow.first()
-        val legacyThemeSettings = uiSettingsContent.theme
-        val themeSettings = settingsRepository.themeSettings
-
-        if (legacyThemeSettings != null) {
-            val newThemeSettings = ThemeSettings(
-                darkMode = legacyThemeSettings.darkMode,
-                useDynamicTheme = legacyThemeSettings.dynamicTheme,
-            )
-            themeSettings.update { newThemeSettings }
-            uiSettings.update { uiSettingsContent.copy(theme = null) }
-        }
     }
 
     koin.get<SessionManager>().startBackgroundJob()
