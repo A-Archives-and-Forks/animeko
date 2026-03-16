@@ -239,7 +239,9 @@ internal fun EpisodeVideoImpl(
                                 }
                             }
                         },
-                        windowInsets = contentWindowInsets,
+                        // VideoScaffold already applies top/horizontal insets around the top bar.
+                        // Passing the same insets into TopAppBar duplicates the status-bar padding on iOS portrait.
+                        windowInsets = WindowInsets(0.dp),
                     )
                 }
             },

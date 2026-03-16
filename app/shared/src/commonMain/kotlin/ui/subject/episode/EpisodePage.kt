@@ -157,6 +157,7 @@ import me.him188.ani.danmaku.ui.DanmakuPresentation
 import me.him188.ani.datasources.api.source.MediaFetchRequest
 import me.him188.ani.utils.platform.isAndroid
 import me.him188.ani.utils.platform.isDesktop
+import me.him188.ani.utils.platform.isIos
 import me.him188.ani.utils.platform.isMobile
 import org.openani.mediamp.features.AudioLevelController
 import org.openani.mediamp.features.PlaybackSpeed
@@ -628,7 +629,14 @@ private fun EpisodeScreenContentPhone(
     val toaster = LocalToaster.current
     val videoWindowInsets = windowInsets
         .union(WindowInsets.desktopTitleBar)
-        .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+        .run {
+            // iOS 上的 top window insets 没有被正确消耗, 手动排除 top insets
+            if (LocalPlatform.current.isIos()) {
+                only(WindowInsetsSides.Horizontal)
+            } else {
+                only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+            }
+        }
     val columnInsets = videoWindowInsets.only(WindowInsetsSides.Horizontal)
 
     EpisodeScreenContentPhoneScaffold(
