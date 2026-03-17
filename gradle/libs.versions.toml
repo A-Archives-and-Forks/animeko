@@ -19,6 +19,7 @@ datastore = "1.2.0" # https://developer.android.com/jetpack/androidx/releases/da
 ksp = "2.3.5" # https://github.com/google/ksp/releases
 # note: room 2.7.0-rc01 cannot compile
 room = "2.8.4" # https://developer.android.com/jetpack/androidx/releases/room#declaring_dependencies
+s3 = "2.42.14"
 sentry-kotlin-multiplatform = "0.11.0"
 sqlite = "2.6.1"
 androidx-activity = "1.12.4"
@@ -313,6 +314,7 @@ bytebuddy-agent = { module = "net.bytebuddy:byte-buddy-agent", version.ref = "by
 bytebuddy = { module = "net.bytebuddy:byte-buddy", version.ref = "bytebuddy" }
 sentry-kotlin-multiplatform = { module = "io.sentry:sentry-kotlin-multiplatform", version.ref = "sentry-kotlin-multiplatform" }
 sentry-compose-android = { module = "io.sentry:sentry-compose-android", version.ref = "sentry-compose-android" }
+awssdk-s3 = { module = "software.amazon.awssdk:s3", version.ref = "s3" }
 
 firebase-analytics = { module = "dev.gitlive:firebase-analytics", version.ref = "gitlive-firebase" }
 google-firebase-common = { module = "com.google.firebase:firebase-common", version.ref = "google-firebase" }
