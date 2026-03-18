@@ -268,10 +268,13 @@ tasks.register("updateDevVersionNameFromGit") {
 tasks.register("updateReleaseVersionNameFromGit") {
     doLast {
         val releaseVersion = ReleaseArtifactNames.fullVersionFromTag(ciTag.get())
+        val releaseVersionCode = ReleaseArtifactNames.versionCodeFromTag(ciTag.get())
         val propertiesText = gradleProperties.readText()
-        println("New version name: $releaseVersion")
+        println("New version: $releaseVersion($releaseVersionCode)")
         gradleProperties.writeText(
-            propertiesText.replaceFirst(Regex("version.name=(.+)"), "version.name=$releaseVersion"),
+            propertiesText
+                .replaceFirst(Regex("version.name=(.+)"), "version.name=$releaseVersion")
+                .replaceFirst(Regex("android.version.code=(.+)"), "android.version.code=$releaseVersionCode"),
         )
     }
 }

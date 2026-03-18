@@ -51,6 +51,57 @@ object ReleaseArtifactNames {
 
     fun fullVersionFromTag(tag: String): String = tag.removePrefix("v")
 
+    // alpha 和 beta 版本不能超过 5 个, 因为只有一位数可以给它用
+    fun versionCodeFromTag(tag: String): String {
+        val match = Regex("""^v(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)(\d+))?$""").matchEntire(tag)
+            ?: throw GradleException("Unsupported tag format: '$tag'")
+
+        val major = match.groupValues[1].toIntOrNull()
+        val minor = match.groupValues[2].toIntOrNull()
+        val patch = match.groupValues[3].toIntOrNull()
+        val channel = match.groupValues[4]
+        val meta = match.groupValues[5].toIntOrNull()
+
+        require(major != null && major in 0..9) {
+            "Major version '$major' in tag '$tag' cannot be encoded into a single digit."
+        }
+        require(minor != null && minor in 0..99) {
+            "Minor version '$minor' in tag '$tag' cannot be encoded into two digits."
+        }
+        require(patch != null && patch in 0..9) {
+            "Patch version '$patch' in tag '$tag' cannot be encoded into a single digit."
+        }
+
+        val metaDigit = when (channel) {
+            "alpha" -> when (meta) {
+                1 -> 0
+                2 -> 1
+                3 -> 2
+                4 -> 3
+                5 -> 4
+                else -> 0
+            }
+
+            "beta" -> when (meta) {
+                1 -> 5
+                2 -> 6
+                3 -> 7
+                4 -> 8
+                5 -> 9
+                else -> 0
+            }
+
+            else -> 0
+        }
+
+        return buildString(5) {
+            append(major)
+            append(minor.toString().padStart(2, '0'))
+            append(patch)
+            append(metaDigit)
+        }
+    }
+
     fun androidApp(fullVersion: String, arch: String): String = "$appName-$fullVersion-$arch.apk"
 
     fun androidAppQr(fullVersion: String, arch: String, server: String): String =
