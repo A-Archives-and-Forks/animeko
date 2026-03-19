@@ -309,7 +309,7 @@ class AutoSelectExtensionTest : AbstractPlayerExtensionTest() {
         if (expected == null) {
             assertEquals(null, suite.player.mediaData.first())
         } else {
-            assertIs<UriMediaData>(suite.player.mediaData.first()) // Player is playing
+            assertIs<UriMediaData>(suite.player.mediaData.filterNotNull().first()) // Player is playing
             assertEquals(0, suite.player.currentPositionMillis.value) // State is reset
         }
     }
