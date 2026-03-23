@@ -11,7 +11,13 @@
 package me.him188.ani.utils.httpdownloader
 
 import androidx.room.TypeConverter
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import me.him188.ani.utils.serialization.DatabaseProtoBuf
 
 class DownloadIdConverter {
@@ -30,9 +36,60 @@ object SegmentInfoListConverter {
     @Serializable
     private class Node(val value: List<SegmentInfo>)
 
+    private object LegacyDeserializer : KSerializer<Node> {
+        @Serializable
+        private data class LegacySegmentInfo(
+            val index: Int,
+            val url: String,
+            val isDownloaded: Boolean,
+            val byteSize: Long = -1,
+            @SerialName("tempFilePath")
+            val relativeTempFilePath: String,
+            val rangeStart: Long? = null,
+            val rangeEnd: Long? = null,
+        ) {
+            fun toSegmentInfo(): SegmentInfo {
+                return SegmentInfo(
+                    index = index,
+                    url = url,
+                    isDownloaded = isDownloaded,
+                    byteSize = byteSize,
+                    durationSeconds = null,
+                    title = null,
+                    isDiscontinuity = false,
+                    encryption = null,
+                    relativeTempFilePath = relativeTempFilePath,
+                    rangeStart = rangeStart,
+                    rangeEnd = rangeEnd,
+                )
+            }
+        }
+
+        @Serializable
+        private data class LegacyNode(val value: List<LegacySegmentInfo>)
+        
+        override val descriptor: SerialDescriptor = LegacyNode.serializer().descriptor
+
+        override fun serialize(encoder: Encoder, value: Node) {
+            throw NotImplementedError("For deserialization only.")
+        }
+
+        override fun deserialize(decoder: Decoder): Node {
+            return Node(
+                LegacyNode.serializer().deserialize(decoder).value.map {
+                    it.toSegmentInfo()
+                }
+            )
+        }
+    }
+
     @TypeConverter
     fun fromByteArray(value: ByteArray): List<SegmentInfo> {
-        return DatabaseProtoBuf.decodeFromByteArray(Node.serializer(), value).value
+        return try {
+            DatabaseProtoBuf.decodeFromByteArray(Node.serializer(), value).value
+        } catch (_: SerializationException) {
+            DatabaseProtoBuf.decodeFromByteArray(LegacyDeserializer, value).value
+        }
     }
 
     @TypeConverter
