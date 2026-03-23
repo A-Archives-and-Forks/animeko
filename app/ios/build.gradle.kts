@@ -385,7 +385,7 @@ val patchInfoPlist = tasks.register("patchInfoPlist", Task::class) {
 
     val versionName = getProperty("version.name").substringBefore("-")
     inputs.property("version.name", versionName)
-    val versionCode = getProperty("android.version.code")
+    val versionCode = getProperty("ios.version.code")
     inputs.property("version.code", versionCode)
 
     val templateFile = file("Animeko/Info.plist.template.txt")
