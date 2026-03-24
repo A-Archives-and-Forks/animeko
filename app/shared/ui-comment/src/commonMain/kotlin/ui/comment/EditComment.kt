@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloseFullscreen
@@ -135,7 +134,10 @@ fun EditComment(
         },
         captcha = {
             if (!sendingComment) return@EditCommentScaffold
-            Turnstile(turnstileState, Modifier.wrapContentSize())
+            Turnstile(
+                state = turnstileState,
+                modifier = Modifier.fillMaxWidth().height(100.dp),
+            )
         },
         expanded = state.expandButtonState,
         onClickExpand = { state.editExpanded = it },

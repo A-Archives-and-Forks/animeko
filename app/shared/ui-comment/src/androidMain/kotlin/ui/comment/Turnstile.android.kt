@@ -152,8 +152,16 @@ actual fun ActualTurnstile(
     val isDark = isSystemInDarkTheme()
     val currentLayoutParams = remember(constraints) {
         LayoutParams(
-            if (constraints.hasFixedWidth) LayoutParams.MATCH_PARENT else LayoutParams.WRAP_CONTENT,
-            if (constraints.hasFixedHeight) LayoutParams.MATCH_PARENT else LayoutParams.WRAP_CONTENT,
+            if (constraints.hasBoundedWidth && constraints.maxWidth > 0) {
+                LayoutParams.MATCH_PARENT
+            } else {
+                LayoutParams.WRAP_CONTENT
+            },
+            if (constraints.hasBoundedHeight && constraints.maxHeight > 0) {
+                LayoutParams.MATCH_PARENT
+            } else {
+                LayoutParams.WRAP_CONTENT
+            },
         )
     }
 
@@ -182,4 +190,3 @@ actual fun ActualTurnstile(
         }
     }
 }
-
