@@ -35,6 +35,9 @@
 # anitorrent
 -keep class org.openani.anitorrent.binding.** { *; }
 
+# ffmpeg native
+-keep class org.openani.mediamp.ffmpeg.JvmFFmpegProcess { *; }
+
 # Android AIDL for torrent service.
 -keepnames class me.him188.ani.app.domain.torrent.I* { *; }
 -keepnames class me.him188.ani.app.domain.torrent.parcel.** { *; }
