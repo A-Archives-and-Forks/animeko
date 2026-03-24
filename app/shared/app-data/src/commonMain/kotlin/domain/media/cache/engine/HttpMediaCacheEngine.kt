@@ -207,22 +207,8 @@ class HttpMediaCacheEngine(
         internal val downloadId: DownloadId,
         override val metadata: MediaCacheMetadata,
     ) : MediaCache {
-        override val state: Flow<MediaCacheState> = downloader.getProgressFlow(downloadId).map {
-            when (it.status) {
-                DownloadStatus.DOWNLOADING,
-                DownloadStatus.MERGING,
-                DownloadStatus.COMPLETED,
-                    -> MediaCacheState.IN_PROGRESS
-
-                DownloadStatus.INITIALIZING,
-                DownloadStatus.PAUSED,
-                    -> MediaCacheState.PAUSED
-
-                DownloadStatus.FAILED,
-                DownloadStatus.CANCELED,
-                    -> MediaCacheState.PAUSED
-            }
-        }
+        override val state: Flow<MediaCacheState> =
+            downloader.getProgressFlow(downloadId).map { it.status.toMediaCacheState() }
 
         override val canPlay: Flow<Boolean>
             get() = downloader.getProgressFlow(downloadId).map {
@@ -358,6 +344,25 @@ class HttpMediaCacheEngine(
         @Deprecated("Use HttpMediaCacheEngine.MEDIA_CACHE_DIR instead")
         const val LEGACY_MEDIA_CACHE_DIR = "web-m3u-cache"
         const val MEDIA_CACHE_DIR = "web-m3u"
+    }
+}
+
+internal fun DownloadStatus.toMediaCacheState(): MediaCacheState {
+    return when (this) {
+        DownloadStatus.DOWNLOADING,
+        DownloadStatus.MERGING,
+            -> MediaCacheState.IN_PROGRESS
+
+        DownloadStatus.INITIALIZING,
+        DownloadStatus.PAUSED,
+            -> MediaCacheState.PAUSED
+
+        DownloadStatus.FAILED,
+        DownloadStatus.CANCELED,
+            -> MediaCacheState.FAILED
+
+        DownloadStatus.COMPLETED,
+            -> MediaCacheState.COMPLETED
     }
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025 OpenAni and contributors.
+ * Copyright (C) 2024-2026 OpenAni and contributors.
  *
  * 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
  * Use of this source code is governed by the GNU AGPLv3 license, which can be found at the following link.
@@ -69,9 +69,13 @@ abstract class MediaCacheManager(
 
             for (mediaCache in list) {
                 if (mediaCache.metadata.subjectId == subjectIdString && mediaCache.metadata.episodeId == episodeIdString) {
-                    hasAnyCaching = mediaCache
-                    if (mediaCache.isFinished()) {
-                        hasAnyCached = mediaCache
+                    when (mediaCache.state.first()) {
+                        MediaCacheState.COMPLETED -> hasAnyCached = mediaCache
+                        MediaCacheState.IN_PROGRESS,
+                        MediaCacheState.PAUSED,
+                            -> hasAnyCaching = mediaCache
+
+                        MediaCacheState.FAILED -> Unit
                     }
                 }
             }
@@ -81,11 +85,17 @@ abstract class MediaCacheManager(
                 emit(EpisodeCacheStatus.NotCached)
             } else {
                 emitAll(
-                    target.fileStats.map {
-                        if (it.downloadProgress.isFinished) {
-                            EpisodeCacheStatus.Cached(totalSize = it.totalSize)
-                        } else {
-                            EpisodeCacheStatus.Caching(progress = it.downloadProgress, totalSize = it.totalSize)
+                    target.state.combine(target.fileStats) { state, stats ->
+                        when (state) {
+                            MediaCacheState.COMPLETED -> EpisodeCacheStatus.Cached(totalSize = stats.totalSize)
+                            MediaCacheState.IN_PROGRESS,
+                            MediaCacheState.PAUSED,
+                                -> EpisodeCacheStatus.Caching(
+                                progress = stats.downloadProgress,
+                                totalSize = stats.totalSize,
+                            )
+
+                            MediaCacheState.FAILED -> EpisodeCacheStatus.NotCached
                         }
                     },
                 )

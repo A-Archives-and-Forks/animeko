@@ -20,20 +20,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Downloading
+import androidx.compose.material.icons.rounded.FileDownloadOff
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Restore
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -42,7 +37,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -57,12 +51,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.him188.ani.app.tools.Progress
 import me.him188.ani.app.tools.getOrZero
 import me.him188.ani.app.tools.rememberUiMonoTasker
 import me.him188.ani.app.tools.toProgress
+import me.him188.ani.app.ui.cache.CacheActionDropdown
+import me.him188.ani.app.ui.cache.DeleteActionDialog
 import me.him188.ani.app.ui.foundation.AsyncImage
 import me.him188.ani.app.ui.foundation.ProvideCompositionLocalsForPreview
 import me.him188.ani.app.ui.foundation.interaction.clickableAndMouseRightClick
@@ -70,7 +67,6 @@ import me.him188.ani.app.ui.foundation.layout.currentWindowAdaptiveInfo1
 import me.him188.ani.app.ui.foundation.layout.isWidthAtLeastMedium
 import me.him188.ani.app.ui.foundation.text.ProvideContentColor
 import me.him188.ani.app.ui.foundation.text.ProvideTextStyleContentColor
-import me.him188.ani.app.ui.foundation.widgets.LocalToaster
 import me.him188.ani.datasources.api.topic.FileSize.Companion.Unspecified
 import me.him188.ani.datasources.api.topic.FileSize.Companion.megaBytes
 import me.him188.ani.utils.platform.annotations.TestOnly
@@ -79,6 +75,8 @@ import me.him188.ani.utils.platform.annotations.TestOnly
 enum class CacheEpisodePaused {
     IN_PROGRESS,
     PAUSED,
+    FAILED,
+    COMPLETED,
 }
 
 @Composable
@@ -92,8 +90,19 @@ fun CacheEpisodeItem(
     containerColor: Color = MaterialTheme.colorScheme.surface,
 ) {
     var showDropdown by remember { mutableStateOf(false) }
+    var showConfirm by rememberSaveable { mutableStateOf(false) }
     val listItemColors = ListItemDefaults.colors(containerColor = containerColor)
     val scope = rememberUiMonoTasker()
+
+    if (showConfirm) {
+        DeleteActionDialog(
+            onDismiss = { showConfirm = false },
+            onConfirm = {
+                onDelete()
+                showConfirm = false
+            },
+        )
+    }
     ListItem(
         headlineContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -129,12 +138,8 @@ fun CacheEpisodeItem(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Crossfade(state.isFinished, Modifier.size(20.dp)) {
-                                if (it) {
-                                    Icon(Icons.Rounded.DownloadDone, "下载完成")
-                                } else {
-                                    Icon(Icons.Rounded.Downloading, "下载中")
-                                }
+                            Crossfade(state.state, Modifier.size(20.dp)) {
+                                DownloadStateIcon(it)
                             }
 
                             state.sizeText?.let {
@@ -209,7 +214,7 @@ fun CacheEpisodeItem(
                                 IconButton(onResume) {
                                     Icon(Icons.Rounded.Restore, "继续下载")
                                 }
-                            } else {
+                            } else if (!state.isFailed) {
                                 IconButton(onPause) {
                                     Icon(Icons.Rounded.Pause, "暂停下载", Modifier.size(28.dp))
                                 }
@@ -223,13 +228,15 @@ fun CacheEpisodeItem(
                     Icon(Icons.Rounded.MoreVert, "管理此项")
                 }
             }
-            Dropdown(
-                showDropdown, { showDropdown = false },
-                state,
-                onPlay = { onPlay() },
+            CacheActionDropdown(
+                show = showDropdown,
+                onDismiss = { showDropdown = false },
+                episode = state,
+                onPlay = onPlay,
                 onResume = onResume,
                 onPause = onPause,
-                onDelete = onDelete,
+                onDelete = { showConfirm = true },
+                offset = DpOffset.Zero,
             )
         },
         colors = listItemColors,
@@ -237,104 +244,19 @@ fun CacheEpisodeItem(
 }
 
 @Composable
-private fun Dropdown(
-    showDropdown: Boolean,
-    onDismissRequest: () -> Unit,
-    state: CacheEpisodeState,
-    onPlay: () -> Unit,
-    onResume: () -> Unit,
-    onPause: () -> Unit,
-    onDelete: () -> Unit,
-    modifier: Modifier = Modifier,
+internal fun DownloadStateIcon(
+    state: CacheEpisodePaused,
+    modifier: Modifier = Modifier
 ) {
-    var showConfirm by rememberSaveable { mutableStateOf(false) }
-    if (showConfirm) {
-        AlertDialog(
-            { showConfirm = false },
-            icon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("删除缓存") },
-            text = { Text("删除后不可恢复，确认删除吗?") },
-            confirmButton = {
-                TextButton(
-                    {
-                        onDelete()
-                        showConfirm = false
-                    },
-                ) {
-                    Text("删除", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton({ showConfirm = false }) {
-                    Text("取消")
-                }
-            },
-        )
-    }
-    DropdownMenu(showDropdown, onDismissRequest, modifier) {
-        if (!state.isFinished) {
-            if (state.isPaused) {
-                DropdownMenuItem(
-                    text = { Text("继续下载") },
-                    leadingIcon = { Icon(Icons.Rounded.Restore, null) },
-                    onClick = {
-                        onResume()
-                        onDismissRequest()
-                    },
-                )
-            } else {
-                DropdownMenuItem(
-                    text = { Text("暂停下载") },
-                    leadingIcon = { Icon(Icons.Rounded.Pause, null) },
-                    onClick = {
-                        onPause()
-                        onDismissRequest()
-                    },
-                )
-            }
+    when (state) {
+        CacheEpisodePaused.COMPLETED -> Icon(Icons.Rounded.DownloadDone, "下载完成")
+        CacheEpisodePaused.FAILED -> ProvideContentColor(MaterialTheme.colorScheme.error) {
+            Icon(Icons.Rounded.FileDownloadOff, "下载失败")
         }
 
-        val toaster = LocalToaster.current
-        DropdownMenuItem(
-            text = { Text("播放") },
-            leadingIcon = {
-                // 这个内容如果太大会导致影响 text
-                Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                    // 这个图标比其他图标小
-                    Icon(Icons.Rounded.PlayArrow, null, Modifier.requiredSize(28.dp))
-                }
-            },
-            onClick = {
-                when (state.playability) {
-                    CacheEpisodeState.Playability.PLAYABLE -> {
-                        onPlay()
-                        onDismissRequest()
-                    }
-
-                    CacheEpisodeState.Playability.INVALID_SUBJECT_EPISODE_ID -> {
-                        toaster.toast("信息无效，无法播放")
-                    }
-
-                    CacheEpisodeState.Playability.STREAMING_NOT_SUPPORTED -> {
-                        toaster.toast("此资源不支持边下边播，请等待下载完成")
-                    }
-                }
-            },
-        )
-
-        ProvideContentColor(MaterialTheme.colorScheme.error) {
-            DropdownMenuItem(
-                text = { Text("删除", color = MaterialTheme.colorScheme.error) },
-                leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
-                onClick = {
-                    showConfirm = true
-                    onDismissRequest()
-                },
-            )
-        }
+        else -> Icon(Icons.Rounded.Downloading, "下载中")
     }
 }
-
 
 @OptIn(TestOnly::class)
 @Preview
@@ -398,4 +320,38 @@ private fun PreviewCacheEpisodeItem(
         modifier = modifier,
     )
 
+}
+
+@OptIn(TestOnly::class)
+@Preview
+@Composable
+private fun PreviewCacheGroupCardCompleted() = ProvideCompositionLocalsForPreview {
+    Box(Modifier.background(Color.DarkGray)) {
+        PreviewCacheEpisodeItem(
+            createTestCacheEpisode(
+                1,
+                progress = 1f.toProgress(),
+                downloadSpeed = Unspecified,
+                totalSize = 888.megaBytes,
+                initialState = CacheEpisodePaused.COMPLETED,
+            ),
+        )
+    }
+}
+
+@OptIn(TestOnly::class)
+@Preview
+@Composable
+private fun PreviewCacheGroupCardFailed() = ProvideCompositionLocalsForPreview {
+    Box(Modifier.background(Color.DarkGray)) {
+        PreviewCacheEpisodeItem(
+            createTestCacheEpisode(
+                1,
+                progress = 0.7f.toProgress(),
+                downloadSpeed = Unspecified,
+                totalSize = 888.megaBytes,
+                initialState = CacheEpisodePaused.FAILED,
+            ),
+        )
+    }
 }

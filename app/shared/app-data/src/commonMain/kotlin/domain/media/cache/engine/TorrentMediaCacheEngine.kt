@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025 OpenAni and contributors.
+ * Copyright (C) 2024-2026 OpenAni and contributors.
  *
  * 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
  * Use of this source code is governed by the GNU AGPLv3 license, which can be found at the following link.
@@ -129,7 +129,7 @@ class TorrentMediaCacheEngine(
         override val metadata: MediaCacheMetadata, // 注意, 我们不能写 check 检查这些属性, 因为可能会有旧版本的数据
         val fileHandle: FileHandle
     ) : MediaCache, SynchronizedObject() {
-        override val state: MutableStateFlow<MediaCacheState> = MutableStateFlow(
+        private val desiredState = MutableStateFlow(
             MediaCacheState.IN_PROGRESS,
         )
 
@@ -188,10 +188,20 @@ class TorrentMediaCacheEngine(
                 }
         }.flowOn(flowDispatcher)
 
+        override val state: Flow<MediaCacheState> =
+            combine(desiredState, fileHandle.state, fileStats) { currentState, handleState, stats ->
+                when {
+                    handleState == null -> MediaCacheState.FAILED
+                    stats.isDownloadFinished -> MediaCacheState.COMPLETED
+                    currentState == MediaCacheState.PAUSED -> MediaCacheState.PAUSED
+                    else -> MediaCacheState.IN_PROGRESS
+                }
+            }.flowOn(flowDispatcher)
+
         override suspend fun pause() {
             if (isDeleted.value) return
+            desiredState.value = MediaCacheState.PAUSED
             fileHandle.handle.first()?.pause()
-            state.value = MediaCacheState.PAUSED
         }
 
         override suspend fun close() {
@@ -202,7 +212,7 @@ class TorrentMediaCacheEngine(
         override suspend fun resume() {
             if (isDeleted.value) return
             val file = fileHandle.handle.first()
-            state.value = MediaCacheState.IN_PROGRESS
+            desiredState.value = MediaCacheState.IN_PROGRESS
             logger.info { "Resuming file: $file" }
             file?.resume(FilePriority.NORMAL)
         }

@@ -64,7 +64,8 @@ class CacheEpisodeState(
     val progress get() = stats.progress
 
     val isPaused get() = state == CacheEpisodePaused.PAUSED
-    val isFinished get() = stats.progress.isFinished
+    val isFailed get() = state == CacheEpisodePaused.FAILED
+    val isFinished get() = state == CacheEpisodePaused.COMPLETED
 
     val totalSize: FileSize get() = stats.totalSize
 
@@ -91,13 +92,9 @@ class CacheEpisodeState(
     }
 
     val speedText = run {
-        val progressValue = stats.progress
         val speed = stats.downloadSpeed
-        if (!progressValue.isUnspecified) {
-            val showSpeed = !progressValue.isFinished && speed != FileSize.Companion.Unspecified
-            if (showSpeed) {
-                return@run "${speed}/s"
-            }
+        if (!isFinished && speed != FileSize.Companion.Unspecified) {
+            return@run "${speed}/s"
         }
         null
     }
@@ -140,7 +137,22 @@ val TestCacheEpisodes
     get() = listOf(
         createTestCacheEpisode(1, "孤独摇滚", "翻转孤独", 1),
         createTestCacheEpisode(2, "孤独摇滚", "明天见", 1, initialState = CacheEpisodePaused.PAUSED),
-        createTestCacheEpisode(3, "孤独摇滚", "火速增员", 1, progress = 1f.toProgress()),
+        createTestCacheEpisode(
+            3,
+            "孤独摇滚",
+            "火速增员",
+            1,
+            progress = 1f.toProgress(),
+            initialState = CacheEpisodePaused.COMPLETED,
+        ),
+        createTestCacheEpisode(
+            4,
+            "孤独摇滚",
+            "仍在缓冲",
+            1,
+            initialState = CacheEpisodePaused.FAILED,
+            progress = 0.7f.toProgress(),
+        ),
     )
 
 @OptIn(DelicateCoroutinesApi::class)
@@ -152,15 +164,17 @@ fun createTestCacheEpisode(
     displayName: String = "第 $sort 话",
     subjectId: Int = 1,
     episodeId: Int = sort,
-    initialState: CacheEpisodePaused = when (sort % 2) {
-        0 -> CacheEpisodePaused.PAUSED
-        else -> CacheEpisodePaused.IN_PROGRESS
-    },
+    initialState: CacheEpisodePaused? = null,
     downloadSpeed: FileSize = 233.megaBytes,
     progress: Progress = 0.3f.toProgress(),
     totalSize: FileSize = 888.megaBytes,
 ): CacheEpisodeState {
     val cacheId = Random.nextInt(10000, 99999).toString()
+    val resolvedState = initialState ?: when {
+        progress.isFinished -> CacheEpisodePaused.COMPLETED
+        sort % 2 == 0 -> CacheEpisodePaused.PAUSED
+        else -> CacheEpisodePaused.IN_PROGRESS
+    }
     return CacheEpisodeState(
         groupId = subjectId.toString(),
         subjectId = subjectId,
@@ -176,7 +190,7 @@ fun createTestCacheEpisode(
             progress = progress,
             totalSize = totalSize,
         ),
-        state = initialState,
+        state = resolvedState,
         engineKey = MediaCacheEngineKey.Anitorrent,
         subjectCollectionType = UnifiedCollectionType.DOING,
     )

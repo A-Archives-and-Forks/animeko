@@ -37,8 +37,6 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.DownloadDone
-import androidx.compose.material.icons.rounded.Downloading
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
@@ -95,7 +93,7 @@ import me.him188.ani.app.ui.cache.components.CacheFilterAndSortState
 import me.him188.ani.app.ui.cache.components.CacheGroupState
 import me.him188.ani.app.ui.cache.components.CacheManagementOverallStats
 import me.him188.ani.app.ui.cache.components.CacheSelectionState
-import me.him188.ani.app.ui.cache.components.CacheStatusFilter
+import me.him188.ani.app.ui.cache.components.DownloadStateIcon
 import me.him188.ani.app.ui.cache.components.TestCacheGroupSates
 import me.him188.ani.app.ui.cache.components.createTestMediaStats
 import me.him188.ani.app.ui.cache.components.rememberCacheFilterAndSortState
@@ -570,7 +568,7 @@ private fun CacheManagementTopBar(
 
 
 @Composable
-private fun DeleteActionDialog(
+internal fun DeleteActionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
@@ -681,8 +679,6 @@ private fun CacheListItem(
 ) {
     var showMenu by rememberSaveable { mutableStateOf(false) }
     var showConfirm by rememberSaveable { mutableStateOf(false) }
-    val statusIcon =
-        if (entry.status == CacheStatusFilter.Finished) Icons.Rounded.DownloadDone else Icons.Rounded.Downloading
 
     if (showConfirm) {
         DeleteActionDialog(
@@ -747,7 +743,7 @@ private fun CacheListItem(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(statusIcon, null)
+                    DownloadStateIcon(entry.state)
                     if (selectionMode) {
                         Checkbox(
                             checked = selected,
@@ -820,7 +816,7 @@ private fun renderEngineIcon(key: MediaCacheEngineKey) = when (key) {
 }
 
 @Composable
-private fun CacheActionDropdown(
+internal fun CacheActionDropdown(
     show: Boolean,
     onDismiss: () -> Unit,
     episode: CacheEpisodeState,
@@ -828,50 +824,78 @@ private fun CacheActionDropdown(
     onResume: () -> Unit,
     onPause: () -> Unit,
     onDelete: () -> Unit,
-    onViewDetail: () -> Unit,
+    onViewDetail: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    offset: DpOffset = DpOffset.Zero,
 ) {
     val toaster = LocalToaster.current
     DropdownMenu(
         expanded = show,
         onDismissRequest = onDismiss,
-        offset = DpOffset(x = (-20).dp, y = 0.dp),
+        modifier = modifier,
+        offset = offset,
     ) {
         if (!episode.isFinished) {
             if (episode.isPaused) {
                 DropdownMenuItem(
                     text = { Text("继续下载") },
                     leadingIcon = { Icon(Icons.Rounded.Restore, null) },
-                    onClick = onResume,
+                    onClick = {
+                        onResume()
+                        onDismiss()
+                    },
                 )
-            } else {
+            } else if (!episode.isFailed) {
                 DropdownMenuItem(
                     text = { Text("暂停下载") },
                     leadingIcon = { Icon(Icons.Rounded.Pause, null) },
-                    onClick = onPause,
+                    onClick = {
+                        onPause()
+                        onDismiss()
+                    },
                 )
             }
         }
-        DropdownMenuItem(
-            text = { Text("播放") },
-            leadingIcon = { Icon(Icons.Rounded.PlayArrow, null) },
-            onClick = {
-                when (episode.playability) {
-                    CacheEpisodeState.Playability.PLAYABLE -> onPlay()
-                    CacheEpisodeState.Playability.INVALID_SUBJECT_EPISODE_ID -> toaster.toast("缓存信息无效，无法播放")
-                    CacheEpisodeState.Playability.STREAMING_NOT_SUPPORTED -> toaster.toast("此资源不支持边下边播，请等待下载完成")
-                }
-            },
-        )
-        DropdownMenuItem(
-            text = { Text("更多信息") },
-            leadingIcon = { Icon(Icons.Rounded.Info, null) },
-            onClick = onViewDetail,
-        )
+        if (!episode.isFailed) {
+            DropdownMenuItem(
+                text = { Text("播放") },
+                leadingIcon = { Icon(Icons.Rounded.PlayArrow, null) },
+                onClick = {
+                    when (episode.playability) {
+                        CacheEpisodeState.Playability.PLAYABLE -> {
+                            onPlay()
+                            onDismiss()
+                        }
+
+                        CacheEpisodeState.Playability.INVALID_SUBJECT_EPISODE_ID -> {
+                            toaster.toast("缓存信息无效，无法播放")
+                        }
+
+                        CacheEpisodeState.Playability.STREAMING_NOT_SUPPORTED -> {
+                            toaster.toast("此资源不支持边下边播，请等待下载完成")
+                        }
+                    }
+                },
+            )
+        }
+        onViewDetail?.let {
+            DropdownMenuItem(
+                text = { Text("更多信息") },
+                leadingIcon = { Icon(Icons.Rounded.Info, null) },
+                onClick = {
+                    it()
+                    onDismiss()
+                },
+            )
+        }
 
         DropdownMenuItem(
             text = { Text("删除", color = MaterialTheme.colorScheme.error) },
             leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
-            onClick = onDelete,
+            onClick = {
+                onDelete()
+                onDismiss()
+            },
         )
     }
 }

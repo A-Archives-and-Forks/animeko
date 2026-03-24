@@ -131,12 +131,7 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
         // stateInBackground has distinctUntilChanged
 
         val stateFlow = mediaCache.cache.state
-            .map {
-                when (it) {
-                    MediaCacheState.IN_PROGRESS -> CacheEpisodePaused.IN_PROGRESS
-                    MediaCacheState.PAUSED -> CacheEpisodePaused.PAUSED
-                }
-            }
+            .map(::toCacheEpisodePaused)
             .stateInBackground(CacheEpisodePaused.IN_PROGRESS)
 
         val metadata = mediaCache.cache.metadata
@@ -197,5 +192,14 @@ internal fun Flow<List<MediaCacheStorage>>.overallStatsFlow(): Flow<MediaStats> 
         } else {
             storages.map { it.stats }.sum()
         }
+    }
+}
+
+internal fun toCacheEpisodePaused(state: MediaCacheState): CacheEpisodePaused {
+    return when (state) {
+        MediaCacheState.IN_PROGRESS -> CacheEpisodePaused.IN_PROGRESS
+        MediaCacheState.PAUSED -> CacheEpisodePaused.PAUSED
+        MediaCacheState.FAILED -> CacheEpisodePaused.FAILED
+        MediaCacheState.COMPLETED -> CacheEpisodePaused.COMPLETED
     }
 }
