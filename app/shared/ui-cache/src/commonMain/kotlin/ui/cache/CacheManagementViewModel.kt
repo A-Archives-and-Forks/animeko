@@ -87,7 +87,9 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
                     .onStart { emit(UnifiedCollectionType.NOT_COLLECTED) }
 
                 combine(caches.map { createCacheEpisodeFlow(groupId, it, collectionType) }) { states ->
-                    states.toList()
+                    // 防止意外情况出现了相同的 list key, 也就是相同的数据源的同一剧集缓存.
+                    // 就算出现了 duplicated key, 这两个 item 对应的 cache 是同一个引用.
+                    states.toList().distinctBy { it.listItemKey }
                 }.combine(collectionType) { entries, type ->
                     CacheGroupState(
                         subjectId.toInt(),

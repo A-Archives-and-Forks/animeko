@@ -239,7 +239,7 @@ interface MediaCache {
             fun removeSpecials(value: String): String {
                 return value.replace(Regex("""[-\\|/.,;'\[\]{}()=_ ~!@#$%^&*]"""), "")
             }
-            return "${removeSpecials(subjectName).take(8)}-$hash"
+            return "${removeSpecials(subjectName)}-$hash"
         }
     }
 }
