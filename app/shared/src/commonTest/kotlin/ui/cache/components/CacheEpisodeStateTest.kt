@@ -127,7 +127,7 @@ class CacheEpisodeStateTest {
             progress = 1f.toProgress(),
         ).run {
             assertEquals(false, isPaused)
-            assertEquals(true, isFinished)
+            assertEquals(false, isFinished)
             assertEquals("200.0 MB", sizeText)
             assertEquals(null, progressText)
             assertEquals(1f, progress.getOrNull())
@@ -165,7 +165,7 @@ class CacheEpisodeStateTest {
             progress = 1f.toProgress(),
         ).run {
             assertEquals("200.0 MB", sizeText)
-            assertEquals(null, progressText)
+            assertEquals("100.0%", progressText)
             assertEquals(null, speedText)
         }
         cacheEpisode(
