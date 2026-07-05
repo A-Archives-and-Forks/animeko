@@ -35,6 +35,14 @@ get_density() { # override density wins over physical
   adb shell wm density | tr -d '\r' | awk -F': ' '/Override/{o=$2} /Physical/{p=$2} END{print (o ? o : p)}'
 }
 
+record_size() { # half the display, 16-aligned: the emulator encoder rejects full-size video (err=-22)
+  adb shell wm size | tr -d '\r' | awk -F': ' '/Override/{o=$2} /Physical/{p=$2} END{
+    s=(o ? o : p); split(s, a, "x");
+    w=int(a[1]/32)*16; h=int(a[2]/32)*16;
+    if (w<16) w=16; if (h<16) h=16;
+    printf "%dx%d", w, h}'
+}
+
 case "$cmd" in
   emulator)
     emu="$SDK/emulator/emulator"
@@ -191,6 +199,50 @@ case "$cmd" in
     adb logcat -d -b crash | tail -n "${1:-120}"
     ;;
 
+  record)
+    secs="${1:?usage: droid.sh record <seconds> [out.mp4]}"
+    out="${2:-$OUT_DIR/rec-$(date +%Y%m%d-%H%M%S).mp4}"
+    mkdir -p "$(dirname "$out")"
+    (( secs <= 180 )) || { echo "screenrecord caps at 180s" >&2; exit 2; }
+    size="$(record_size)"
+    echo "Recording screen for ${secs}s at $size..." >&2
+    adb shell screenrecord --size "$size" --time-limit "$secs" --bit-rate 8000000 /sdcard/ani-rec.mp4
+    sleep 1
+    adb pull /sdcard/ani-rec.mp4 "$out" >/dev/null
+    adb shell rm -f /sdcard/ani-rec.mp4
+    echo "$out"
+    ;;
+
+  record-start)
+    out="${1:-$OUT_DIR/rec-$(date +%Y%m%d-%H%M%S).mp4}"
+    mkdir -p "$(dirname "$out")"
+    size="$(record_size)"
+    # redirect: the detached recorder must not inherit our stdout, or callers using
+    # $(record-start) block until the recorder exits
+    adb shell screenrecord --size "$size" --time-limit 180 --bit-rate 8000000 /sdcard/ani-rec.mp4 \
+      >"$OUT_DIR/.droid-rec.log" 2>&1 &
+    echo "$! $out" > "$OUT_DIR/.droid-rec"
+    sleep 1
+    echo "recording started (auto-stops at 180s); stop with: droid.sh record-stop" >&2
+    echo "$out"
+    ;;
+
+  record-stop)
+    [[ -f "$OUT_DIR/.droid-rec" ]] || { echo "no recording in progress (use record-start first)" >&2; exit 1; }
+    read -r rec_pid out < "$OUT_DIR/.droid-rec"
+    rm -f "$OUT_DIR/.droid-rec"
+    adb shell pkill -INT screenrecord >/dev/null 2>&1 || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$rec_pid" 2>/dev/null || break; sleep 0.5; done
+    sleep 1 # let the muxer finalize the mp4
+    adb pull /sdcard/ani-rec.mp4 "$out" >/dev/null
+    adb shell rm -f /sdcard/ani-rec.mp4
+    echo "$out"
+    ;;
+
+  frames)
+    python3 "$SCRIPT_DIR/frame_diff.py" "$@"
+    ;;
+
   devices)
     adb devices -l
     ;;
@@ -216,6 +268,10 @@ Set ANDROID_SERIAL when multiple devices are connected. Set ANI_AVD to use anoth
   key <keycode> | back | home
   display wide|tablet|phone|reset
   logcat [n] | crashes [n]    app log tail / crash buffer
+  record <secs> [out.mp4]     record the screen for N seconds (max 180), print the video path
+  record-start [out.mp4]      start recording in background; interact, then record-stop
+  record-stop                 stop recording, pull + print the video path
+  frames <video> [args]       analyze a recording for transient glitches (frame_diff.py; --help for options)
   devices
 EOF
     ;;

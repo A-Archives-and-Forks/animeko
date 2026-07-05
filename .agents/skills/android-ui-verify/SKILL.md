@@ -1,6 +1,6 @@
 ---
 name: android-ui-verify
-description: Drive the Animeko Android app on an emulator like a real user to verify UI behavior — start emulator, build & install the app, then screenshot/tap/swipe/type in a loop and confirm results visually. Use when a change needs runtime Android UI evidence, when asked to "verify on Android", "test in the emulator", "simulate user interaction", or to reproduce an Android UI bug.
+description: Drive the Animeko Android app on an emulator like a real user to verify UI behavior — start emulator, build & install the app, then screenshot/tap/swipe/type in a loop and confirm results visually. Can also record the screen and diff frames to catch sub-second transient glitches (flicker, jump-and-revert bugs). Use when a change needs runtime Android UI evidence, when asked to "verify on Android", "test in the emulator", "simulate user interaction", or to reproduce an Android UI bug.
 ---
 
 # Animeko Android UI Verification
@@ -92,14 +92,34 @@ $DROID crashes        # crash buffer only (`logcat -b crash`)
 
 Use these whenever behavior looks wrong before drawing conclusions, and attach relevant lines to findings.
 
-## 6. Verify & report
+## 6. Screen recording — catching transient glitches
+
+Some bugs are visible for well under a second: a seek bar that jumps to a wrong position and back, a flash of empty/mis-styled content, a one-frame layout shift during a transition. Screenshots will miss them — record the screen and diff the frames instead:
+
+```bash
+REC=$($DROID record-start)     # starts recording in background, prints the output .mp4 path
+$DROID tap ... / swipe ...     # do the interaction that should (or should not) glitch
+$DROID record-stop             # stops, pulls, prints the video path
+$DROID frames "$REC"           # scans all frames, prints change events + exported images
+```
+
+`frames` (= `scripts/frame_diff.py`, needs `ffmpeg` on PATH) scores every consecutive-frame difference, groups spikes into events, and per event exports a **contact sheet** (frames tiled left→right, top→bottom — Read it to see the whole sequence at a glance) plus full-res frames named by video timestamp. How to work with it:
+
+- **Recordings are VFR**: frames are written only when the screen changes, so a gap in timestamps *proves* the screen was static there. Any frame = something changed.
+- **Judge events against your own actions.** Count and order your taps: an event when nothing should have changed, or a change-then-revert pair in quick succession, is the glitch. Timestamps are video-relative (recording starts ~1–2 s before `record-start` returns), so correlate by order/spacing, not wall clock.
+- Zoom into a moment with `$DROID frames <video> --around <t> --window 0.5`; print the full per-frame score timeline with `--list`.
+- **Small elements barely move the frame-wide score** (a progress bar is ~2 % of pixels). Crop to the region of interest: `--crop W:H:X:Y` in *video* pixels, and/or lower `--threshold` (default 0.01, try 0.003).
+- Recordings are made at **half display resolution** (`--size` display/2, 16-aligned — the emulator encoder rejects full size, and its unsized fallback produces a broken 1-frame video). So video pixel ≈ screenshot/tap pixel ÷ 2.
+- `screenrecord` bakes the display's rotation in at start: if the app rotates mid-recording (e.g. entering the fullscreen player), the video letterboxes. Record within one orientation; `record <seconds>` (blocking) suits no-interaction captures like a launch animation.
+
+## 7. Verify & report
 
 - For each checked behavior state: the action taken, the expected result, and the screenshot path proving it.
 - Screenshots land in `${TMPDIR}/animeko-ui-verify/` by default; pass an explicit path to keep them (e.g. under `../reaction-screenshots/<task>/`).
 - A blank/white screenshot right after launch usually means the app is still loading — wait and retake before concluding breakage.
 - Verification fails ≠ tooling fails: report app crashes (with `crashes` output) as findings, not as skill errors.
 
-## 7. Cleanup
+## 8. Cleanup
 
 Unless the user asked to keep the session running:
 

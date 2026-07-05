@@ -1,6 +1,6 @@
 ---
 name: desktop-ui-verify
-description: Validate the Animeko desktop (Compose Desktop) app by building and launching the real executable, then screenshot/click/type against the macOS window. Use for desktop-only code paths, JCEF/browser behavior, VLC/video playback integration, native libraries, desktop packaging, window chrome, or when asked for PC screenshots/evidence. For Android emulator verification (interactive taps/swipes, Android screenshots, wide-screen simulation) use .agents/skills/android-ui-verify instead.
+description: Validate the Animeko desktop (Compose Desktop) app by building and launching the real executable, then screenshot/click/type against the macOS window. Can also record the window and diff frames to catch sub-second transient glitches (flicker, jump-and-revert bugs). Use for desktop-only code paths, JCEF/browser behavior, VLC/video playback integration, native libraries, desktop packaging, window chrome, or when asked for PC screenshots/evidence. For Android emulator verification (interactive taps/swipes, Android screenshots, wide-screen simulation) use .agents/skills/android-ui-verify instead.
 ---
 
 # Animeko Desktop UI Verification
@@ -58,7 +58,27 @@ $DESK logs 150     # newest app log: ~/Library/Application Support/*Ani*/logs/, 
 
 The app logs `dataDir`/`logsDir` on startup and installs an uncaught-exception handler that logs `!!!ANI FATAL EXCEPTION!!!` — grep for that when the app dies.
 
-## 4. Verify & report
+## 4. Screen recording — catching transient glitches
+
+For bugs visible under a second (a flash of wrong state, a one-frame layout jump, loading flicker), screenshots are not enough — record the window and diff the frames:
+
+```bash
+REC=$($DESK record-start)     # starts recording in background, prints the output .mov path
+$DESK click ... / key ...     # do the interaction that should (or should not) glitch
+$DESK record-stop             # stops (SIGINT-finalizes), prints the video path
+$DESK frames "$REC"           # scans all frames, prints change events + exported images
+```
+
+`frames` (= `scripts/frame_diff.py`, a symlink to the android skill's copy; needs `ffmpeg` on PATH) scores every consecutive-frame difference, groups spikes into events, and per event exports a **contact sheet** (frames tiled left→right, top→bottom — Read it to see the whole sequence at a glance) plus full-res frames named by video timestamp. How to work with it:
+
+- Recording captures the window **by CGWindowID** like screenshots, so it stays correct when other windows overlap. It is VFR at up to ~60 fps: frames are written only when the window content changes, so a timestamp gap *proves* the UI was static there.
+- **Judge events against your own actions**: an event when nothing should have changed, or a change-then-revert pair, is the glitch. Timestamps are video-relative (capture starts before `record-start` returns — the window-id lookup takes a few seconds), so correlate by order/spacing, not wall clock. Mouse hovers create real events too (hover highlights, carousel arrows) — keep the pointer still when it shouldn't participate.
+- Zoom into a moment with `$DESK frames <video> --around <t> --window 0.5`; print every frame's score with `--list`.
+- **The video includes the window shadow**: a 1440x900 window records as 3016x1936, content at offset (68,68) — i.e. video px = screenshot px + 68. `--crop 2880:1800:68:68` trims to exactly the screenshot framing; for a sub-region use `--crop W:H:(x+68):(y+68)` with screenshot-pixel values.
+- Small elements barely move the frame-wide score — crop to the region of interest and/or lower `--threshold` (default 0.01, try 0.003).
+- `record <seconds>` is the blocking variant for no-interaction captures (launch animations, video playback checks).
+
+## 5. Verify & report
 
 - For each checked behavior state: the action, the expected result, and the screenshot path proving it.
 - If the build fails, report the exact failing Gradle task and the first actionable compiler/jlink error.

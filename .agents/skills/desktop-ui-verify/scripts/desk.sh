@@ -22,6 +22,29 @@ end tell
 OSA
 }
 
+window_id() { # prints the CGWindowID of $PROC's main window (match by pid: CGWindow owner name differs)
+  local app_pid
+  app_pid="$(pgrep -xn "$PROC" || true)"
+  if [[ -n "$app_pid" ]]; then
+    swift "$SCRIPT_DIR/find_window_id.swift" --pid "$app_pid" 2>/dev/null
+  else
+    swift "$SCRIPT_DIR/find_window_id.swift" "$PROC" 2>/dev/null
+  fi
+}
+
+normalize_window() { # move to (40,80) and resize to $1x$2 so coordinates match screenshots
+  osascript >/dev/null 2>&1 <<OSA || true
+tell application "System Events"
+  tell process "$PROC"
+    set frontmost to true
+    set position of window 1 to {40, 80}
+    set size of window 1 to {${1:-1440}, ${2:-900}}
+    delay 0.3
+  end tell
+end tell
+OSA
+}
+
 case "$cmd" in
   build)
     "$SCRIPT_DIR/build_desktop_distributable.sh" "$@"
@@ -81,6 +104,47 @@ OSA
     echo "pressed $name"
     ;;
 
+  record)
+    secs="${1:?usage: desk.sh record <seconds> [out.mov]}"
+    out="${2:-$OUT_DIR/desktop-rec-$(date +%Y%m%d-%H%M%S).mov}"
+    mkdir -p "$(dirname "$out")"
+    normalize_window
+    wid="$(window_id)"
+    [[ -n "$wid" ]] || { echo "cannot find $PROC window (app running? Screen Recording permission?)" >&2; exit 1; }
+    echo "Recording window $wid for ${secs}s..." >&2
+    screencapture -x -v -V "$secs" -l "$wid" "$out"
+    echo "$out"
+    ;;
+
+  record-start)
+    out="${1:-$OUT_DIR/desktop-rec-$(date +%Y%m%d-%H%M%S).mov}"
+    mkdir -p "$(dirname "$out")"
+    normalize_window
+    wid="$(window_id)"
+    [[ -n "$wid" ]] || { echo "cannot find $PROC window (app running? Screen Recording permission?)" >&2; exit 1; }
+    # redirect: the detached recorder must not inherit our stdout, or callers using
+    # $(record-start) block until the recorder exits
+    screencapture -x -v -l "$wid" "$out" >"$OUT_DIR/.desk-rec.log" 2>&1 &
+    echo "$! $out" > "$OUT_DIR/.desk-rec"
+    sleep 1
+    echo "recording window $wid; stop with: desk.sh record-stop" >&2
+    echo "$out"
+    ;;
+
+  record-stop)
+    [[ -f "$OUT_DIR/.desk-rec" ]] || { echo "no recording in progress (use record-start first)" >&2; exit 1; }
+    read -r rec_pid out < "$OUT_DIR/.desk-rec"
+    rm -f "$OUT_DIR/.desk-rec"
+    kill -INT "$rec_pid" 2>/dev/null || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$rec_pid" 2>/dev/null || break; sleep 0.5; done
+    [[ -s "$out" ]] || { echo "recording produced no file at $out" >&2; exit 1; }
+    echo "$out"
+    ;;
+
+  frames)
+    python3 "$SCRIPT_DIR/frame_diff.py" "$@"
+    ;;
+
   quit)
     "$SCRIPT_DIR/quit_desktop_app.sh" "${1:-$PROC}"
     ;;
@@ -109,6 +173,10 @@ click/type/key/screenshot need macOS Accessibility permission for the terminal r
   click <x> <y>               click at window-relative POINTS (screenshot PNG pixels / 2 on retina)
   type <ascii>                keystroke text into the frontmost window (ASCII only)
   key return|tab|esc|space|delete|up|down|left|right
+  record <secs> [out.mov]     record the app window for N seconds (window-id capture; overlap-proof)
+  record-start [out.mov]      start recording in background; interact, then record-stop
+  record-stop                 stop recording, print the video path
+  frames <video> [args]       analyze a recording for transient glitches (frame_diff.py; --help for options)
   quit [process]              quit the app (graceful, then pkill)
   logs [n]                    tail newest app log (Application Support .../logs, or test-sandbox for dev runs)
 EOF
