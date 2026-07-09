@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,6 +61,8 @@ import me.him188.ani.app.ui.lang.subject_details_view_all
 import me.him188.ani.app.ui.rating.FiveRatingStars
 import me.him188.ani.app.ui.rating.renderScore
 import me.him188.ani.app.ui.subject.details.components.PersonCard
+import me.him188.ani.app.ui.subject.person.PeoplePreviewTarget
+import me.him188.ani.app.ui.subject.person.rememberPeopleClickHandler
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -154,11 +157,12 @@ fun SubjectRatingSummary(
 }
 
 /**
- * 角色区块: 标题行 (+"查看全部" -> 全量列表 sheet) + 横向卡片条 (2:3 立绘卡 + 角色名 + CV).
+ * 角色区块: 标题行 (+"查看全部" -> 全量列表 sheet) + 横向头像条 (固定圆形头像 + 角色名 + CV).
  *
- * 角色图多为窄长全身立绘 (纵横比可低至 ~1:2), 用 [ContentScale.Fit] 完整显示, 不得裁切人物.
+ * 头像为固定大小圆形, 图片 crop 顶部对齐 (角色图多为全身立绘, 顶部对齐保证露脸).
+ * 尺寸对齐 Figma `CharacterCard`: 桌面 Large (头像 76, 间距 12), 手机 Small (头像 56, 间距 0).
  *
- * @param contentPadding 卡片条与标题的水平内边距; 手机端传水平 16dp 可让卡片条边到边滚动.
+ * @param contentPadding 头像条与标题的水平内边距; 手机端传水平 16dp 可让头像条边到边滚动.
  */
 @Composable
 fun CharactersSection(
@@ -168,6 +172,7 @@ fun CharactersSection(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     itemWidth: Dp = 76.dp,
+    avatarSize: Dp = 76.dp,
     itemSpacing: Dp = 12.dp,
 ) {
     if (exposedCharacters.itemCount == 0) return
@@ -179,39 +184,64 @@ fun CharactersSection(
             onAction = { showAll = true },
             modifier = Modifier.padding(contentPadding),
         )
+        val onClickCharacter = rememberPeopleClickHandler()
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(itemSpacing),
             contentPadding = contentPadding,
         ) {
             items(exposedCharacters.itemCount) { i ->
                 val item = exposedCharacters[i] ?: return@items
-                CharacterAvatarCell(item, itemWidth)
+                CharacterAvatarCell(
+                    item, itemWidth, avatarSize,
+                    onClick = { onClickCharacter(PeoplePreviewTarget.Character(item.character.id)) },
+                )
             }
         }
     }
     if (showAll) {
+        val onClickCharacter = rememberPeopleClickHandler()
         ViewAllSheet(
             title = totalCharactersCount?.let { stringResource(Lang.subject_details_characters_with_count, it) }
                 ?: stringResource(Lang.subject_details_characters),
             items = allCharacters,
             onDismissRequest = { showAll = false },
-        ) { PersonCard(it) }
+        ) {
+            PersonCard(
+                it,
+                Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable {
+                        showAll = false
+                        onClickCharacter(PeoplePreviewTarget.Character(it.character.id))
+                    },
+            )
+        }
     }
 }
 
 @Composable
-private fun CharacterAvatarCell(info: RelatedCharacterInfo, itemWidth: Dp) {
+private fun CharacterAvatarCell(
+    info: RelatedCharacterInfo,
+    itemWidth: Dp,
+    avatarSize: Dp,
+    onClick: () -> Unit,
+) {
     val cv = remember(info) { info.character.actors.firstOrNull()?.displayName }
     Column(
-        Modifier.width(itemWidth),
+        Modifier
+            .width(itemWidth)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(Modifier.size(itemWidth, itemWidth * 3 / 2).clip(MaterialTheme.shapes.small)) {
+        // 固定圆形, crop, 顶部对齐 (立绘顶部为脸部)
+        Box(Modifier.size(avatarSize).clip(CircleShape)) {
             AvatarImage(
                 info.character.imageMedium,
                 Modifier.matchParentSize(),
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
             )
         }
         Text(
@@ -251,6 +281,7 @@ fun StaffSection(
 ) {
     if (exposedStaff.itemCount == 0) return
     var showAll by rememberSaveable { mutableStateOf(false) }
+    val onClickPerson = rememberPeopleClickHandler()
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionHeader(
             stringResource(Lang.subject_details_staff),
@@ -258,9 +289,15 @@ fun StaffSection(
             onAction = { showAll = true },
         )
         if (gridColumns != null) {
-            StaffGrid(exposedStaff, columns = gridColumns, maxItems = maxItems)
+            StaffGrid(
+                exposedStaff, columns = gridColumns, maxItems = maxItems,
+                onClick = { onClickPerson(PeoplePreviewTarget.Person(it.personInfo.id)) },
+            )
         } else {
-            StaffKeyValueList(exposedStaff, maxItems = maxItems)
+            StaffKeyValueList(
+                exposedStaff, maxItems = maxItems,
+                onClick = { onClickPerson(PeoplePreviewTarget.Person(it.personInfo.id)) },
+            )
         }
     }
     if (showAll) {
@@ -269,7 +306,17 @@ fun StaffSection(
                 ?: stringResource(Lang.subject_details_staff),
             items = allStaff,
             onDismissRequest = { showAll = false },
-        ) { PersonCard(it) }
+        ) {
+            PersonCard(
+                it,
+                Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable {
+                        showAll = false
+                        onClickPerson(PeoplePreviewTarget.Person(it.personInfo.id))
+                    },
+            )
+        }
     }
 }
 
@@ -279,6 +326,7 @@ private fun StaffGrid(
     staff: LazyPagingItems<RelatedPersonInfo>,
     columns: Int,
     maxItems: Int,
+    onClick: (RelatedPersonInfo) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     FlowRow(
@@ -290,7 +338,13 @@ private fun StaffGrid(
         val count = minOf(staff.itemCount, maxItems)
         for (i in 0 until count) {
             val person = staff[i] ?: continue
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable { onClick(person) },
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 Text(
                     person.position.nameCn ?: "",
                     style = MaterialTheme.typography.bodySmall,
@@ -320,6 +374,7 @@ private fun StaffGrid(
 private fun StaffKeyValueList(
     staff: LazyPagingItems<RelatedPersonInfo>,
     maxItems: Int,
+    onClick: (RelatedPersonInfo) -> Unit,
     modifier: Modifier = Modifier,
     labelWidth: Dp = 78.dp,
     rowSpacing: Dp = 12.dp,
@@ -327,7 +382,12 @@ private fun StaffKeyValueList(
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(rowSpacing)) {
         for (i in 0 until minOf(staff.itemCount, maxItems)) {
             val person = staff[i] ?: continue
-            Row(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable { onClick(person) },
+            ) {
                 Text(
                     person.position.nameCn ?: "",
                     Modifier.width(labelWidth),
