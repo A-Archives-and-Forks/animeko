@@ -105,12 +105,13 @@ jobs:
       REPO: ${{ github.repository }}
       ISSUE_NUMBER: ${{ github.event.issue.number }}
       ISSUE_URL: ${{ github.event.issue.html_url }}
-      ANI_UI_OUT_DIR: ${{ runner.temp }}/ui-shots   # skills write screenshots here
     steps:
       - name: Set up tool PATH
         run: |
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"   # codex
           echo "/opt/homebrew/bin" >> "$GITHUB_PATH"  # gh, node
+          mkdir -p "$RUNNER_TEMP/ui-shots"
+          echo "ANI_UI_OUT_DIR=$RUNNER_TEMP/ui-shots" >> "$GITHUB_ENV"  # skills write screenshots here
 
       - uses: actions/checkout@v4
         with:
@@ -214,12 +215,13 @@ jobs:
       COMMENT_ID: ${{ github.event.comment.id }}
       PR_URL: ${{ github.event.pull_request.html_url || github.event.issue.html_url }}
       TRIGGER_URL: ${{ github.event.comment.html_url || github.event.review.html_url }}
-      ANI_UI_OUT_DIR: ${{ runner.temp }}/ui-shots   # skills write screenshots here
     steps:
       - name: Set up tool PATH
         run: |
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/ui-shots"
+          echo "ANI_UI_OUT_DIR=$RUNNER_TEMP/ui-shots" >> "$GITHUB_ENV"  # skills write screenshots here
 
       - uses: actions/checkout@v4
         with:
