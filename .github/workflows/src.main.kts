@@ -24,7 +24,6 @@
 @file:DependsOn("org.jetbrains:annotations:23.0.0")
 @file:DependsOn("actions:github-script:v7")
 @file:DependsOn("gradle:actions__setup-gradle:v3")
-@file:DependsOn("timheuer:base64-to-file:v1.1")
 @file:DependsOn("actions:upload-artifact:v4")
 @file:DependsOn("actions:download-artifact:v4")
 @file:DependsOn("reactivecircus:android-emulator-runner:v2.35.0")
@@ -72,7 +71,6 @@ import io.github.typesafegithub.workflows.actions.jlumbroso.FreeDiskSpace_Untype
 import io.github.typesafegithub.workflows.actions.reactivecircus.AndroidEmulatorRunner
 import io.github.typesafegithub.workflows.actions.snowactions.Qrcode_Untyped
 import io.github.typesafegithub.workflows.actions.softprops.ActionGhRelease
-import io.github.typesafegithub.workflows.actions.timheuer.Base64ToFile_Untyped
 import io.github.typesafegithub.workflows.domain.AbstractResult
 import io.github.typesafegithub.workflows.domain.ActionStep
 import io.github.typesafegithub.workflows.domain.CommandStep
@@ -1412,17 +1410,14 @@ class WithMatrix(
     /**
      * Returns the action step if it's enabled, otherwise returns `null`.
      */
-    fun JobBuilder<*>.prepareSigningKey(): ActionStep<Base64ToFile_Untyped.Outputs>? {
+    fun JobBuilder<*>.prepareSigningKey(): CommandStep? {
         return if (matrix.uploadApk) {
-            uses(
+            prepareBase64File(
                 name = "Prepare signing key",
                 `if` = expr { github.isAnimekoRepository and !github.isPullRequest },
-                action = Base64ToFile_Untyped(
-                    fileName_Untyped = "android_signing_key",
-                    fileDir_Untyped = "./",
-                    encodedString_Untyped = expr { secrets.SIGNING_RELEASE_STOREFILE },
-                ),
-                continueOnError = true,
+                fileName = "android_signing_key",
+                fileDir = ".",
+                encodedString = expr { secrets.SIGNING_RELEASE_STOREFILE },
             )
         } else {
             null
@@ -1432,16 +1427,51 @@ class WithMatrix(
     /**
      * Returns the action step if it's enabled, otherwise returns `null`.
      */
-    fun JobBuilder<*>.prepareGoogleServicesJson(): ActionStep<Base64ToFile_Untyped.Outputs>? {
-        return uses(
+    fun JobBuilder<*>.prepareGoogleServicesJson(): CommandStep {
+        return prepareBase64File(
             name = "Prepare google-services.json",
             `if` = expr { github.isAnimekoRepository and !github.isPullRequest },
-            action = Base64ToFile_Untyped(
-                fileName_Untyped = "google-services.json",
-                fileDir_Untyped = "./app/android",
-                encodedString_Untyped = expr { secrets.GOOGLE_SERVICES_JSON },
-            ),
+            fileName = "google-services.json",
+            fileDir = "./app/android",
+            encodedString = expr { secrets.GOOGLE_SERVICES_JSON },
+        )
+    }
+
+    fun JobBuilder<*>.prepareBase64File(
+        name: String,
+        @SuppressWarnings("FunctionParameterNaming")
+        `if`: String,
+        fileName: String,
+        fileDir: String,
+        encodedString: String,
+    ): CommandStep {
+        val filePath = "$fileDir/$fileName"
+        return run(
+            name = name,
+            `if` = `if`,
             continueOnError = true,
+            shell = Shell.Bash,
+            env = mapOf(
+                "BASE64_CONTENT" to encodedString,
+                "FILE_PATH" to filePath,
+            ),
+            command = shell(
+                $$"""
+                set -euo pipefail
+
+                if [ -z "${BASE64_CONTENT:-}" ]; then
+                  echo "BASE64_CONTENT is empty" >&2
+                  exit 1
+                fi
+
+                mkdir -p "$(dirname "$FILE_PATH")"
+                if ! printf '%s' "$BASE64_CONTENT" | base64 --decode > "$FILE_PATH" 2>/dev/null; then
+                  printf '%s' "$BASE64_CONTENT" | base64 -D > "$FILE_PATH"
+                fi
+                chmod 600 "$FILE_PATH"
+                echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
+                """.trimIndent(),
+            ),
         )
     }
 
@@ -1486,7 +1516,7 @@ class WithMatrix(
         }
     }
 
-    fun JobBuilder<*>.buildAndroidApk(prepareSigningKey: ActionStep<Base64ToFile_Untyped.Outputs>) {
+    fun JobBuilder<*>.buildAndroidApk(prepareSigningKey: CommandStep) {
         if (matrix.uploadApk) {
             runGradle(
                 name = "Build Android Debug APKs",
@@ -1518,7 +1548,7 @@ class WithMatrix(
                 `if` = expr { github.isAnimekoRepository and !github.isPullRequest },
                 tasks = arrayOf("assembleDefaultRelease"),
                 env = mapOf(
-                    "signing_release_storeFileFromRoot" to expr { prepareSigningKey.outputs.filePath },
+                    "signing_release_storeFileFromRoot" to expr { prepareSigningKey.outputs["filePath"] },
                     "signing_release_storePassword" to expr { secrets.SIGNING_RELEASE_STOREPASSWORD },
                     "signing_release_keyAlias" to expr { secrets.SIGNING_RELEASE_KEYALIAS },
                     "signing_release_keyPassword" to expr { secrets.SIGNING_RELEASE_KEYPASSWORD },

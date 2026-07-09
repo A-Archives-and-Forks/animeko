@@ -117,12 +117,25 @@ jobs:
       if: '${{ steps.step-10.outcome == ''failure'' }}'
     - id: 'step-12'
       name: 'Prepare google-services.json'
+      env:
+        BASE64_CONTENT: '${{ secrets.GOOGLE_SERVICES_JSON }}'
+        FILE_PATH: './app/android/google-services.json'
       continue-on-error: true
-      uses: 'timheuer/base64-to-file@v1.1'
-      with:
-        fileName: 'google-services.json'
-        fileDir: './app/android'
-        encodedString: '${{ secrets.GOOGLE_SERVICES_JSON }}'
+      shell: 'bash'
+      run: |-
+        set -euo pipefail
+
+        if [ -z "${BASE64_CONTENT:-}" ]; then
+          echo "BASE64_CONTENT is empty" >&2
+          exit 1
+        fi
+
+        mkdir -p "$(dirname "$FILE_PATH")"
+        if ! printf '%s' "$BASE64_CONTENT" | base64 --decode > "$FILE_PATH" 2>/dev/null; then
+          printf '%s' "$BASE64_CONTENT" | base64 -D > "$FILE_PATH"
+        fi
+        chmod 600 "$FILE_PATH"
+        echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
       if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
     - id: 'step-13'
       name: 'Compile Kotlin (Attempt #1)'
@@ -321,21 +334,47 @@ jobs:
       if: '${{ steps.step-13.outcome == ''failure'' }}'
     - id: 'step-15'
       name: 'Prepare signing key'
+      env:
+        BASE64_CONTENT: '${{ secrets.SIGNING_RELEASE_STOREFILE }}'
+        FILE_PATH: './android_signing_key'
       continue-on-error: true
-      uses: 'timheuer/base64-to-file@v1.1'
-      with:
-        fileName: 'android_signing_key'
-        fileDir: './'
-        encodedString: '${{ secrets.SIGNING_RELEASE_STOREFILE }}'
+      shell: 'bash'
+      run: |-
+        set -euo pipefail
+
+        if [ -z "${BASE64_CONTENT:-}" ]; then
+          echo "BASE64_CONTENT is empty" >&2
+          exit 1
+        fi
+
+        mkdir -p "$(dirname "$FILE_PATH")"
+        if ! printf '%s' "$BASE64_CONTENT" | base64 --decode > "$FILE_PATH" 2>/dev/null; then
+          printf '%s' "$BASE64_CONTENT" | base64 -D > "$FILE_PATH"
+        fi
+        chmod 600 "$FILE_PATH"
+        echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
       if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
     - id: 'step-16'
       name: 'Prepare google-services.json'
+      env:
+        BASE64_CONTENT: '${{ secrets.GOOGLE_SERVICES_JSON }}'
+        FILE_PATH: './app/android/google-services.json'
       continue-on-error: true
-      uses: 'timheuer/base64-to-file@v1.1'
-      with:
-        fileName: 'google-services.json'
-        fileDir: './app/android'
-        encodedString: '${{ secrets.GOOGLE_SERVICES_JSON }}'
+      shell: 'bash'
+      run: |-
+        set -euo pipefail
+
+        if [ -z "${BASE64_CONTENT:-}" ]; then
+          echo "BASE64_CONTENT is empty" >&2
+          exit 1
+        fi
+
+        mkdir -p "$(dirname "$FILE_PATH")"
+        if ! printf '%s' "$BASE64_CONTENT" | base64 --decode > "$FILE_PATH" 2>/dev/null; then
+          printf '%s' "$BASE64_CONTENT" | base64 -D > "$FILE_PATH"
+        fi
+        chmod 600 "$FILE_PATH"
+        echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
       if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
     - id: 'step-17'
       name: 'Compile Kotlin (Attempt #1)'
@@ -820,12 +859,25 @@ jobs:
       if: '${{ steps.step-14.outcome == ''failure'' }}'
     - id: 'step-16'
       name: 'Prepare google-services.json'
+      env:
+        BASE64_CONTENT: '${{ secrets.GOOGLE_SERVICES_JSON }}'
+        FILE_PATH: './app/android/google-services.json'
       continue-on-error: true
-      uses: 'timheuer/base64-to-file@v1.1'
-      with:
-        fileName: 'google-services.json'
-        fileDir: './app/android'
-        encodedString: '${{ secrets.GOOGLE_SERVICES_JSON }}'
+      shell: 'bash'
+      run: |-
+        set -euo pipefail
+
+        if [ -z "${BASE64_CONTENT:-}" ]; then
+          echo "BASE64_CONTENT is empty" >&2
+          exit 1
+        fi
+
+        mkdir -p "$(dirname "$FILE_PATH")"
+        if ! printf '%s' "$BASE64_CONTENT" | base64 --decode > "$FILE_PATH" 2>/dev/null; then
+          printf '%s' "$BASE64_CONTENT" | base64 -D > "$FILE_PATH"
+        fi
+        chmod 600 "$FILE_PATH"
+        echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
       if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
     - id: 'step-17'
       name: 'Compile Kotlin (Attempt #1)'
@@ -1036,12 +1088,25 @@ jobs:
       if: '${{ steps.step-13.outcome == ''failure'' }}'
     - id: 'step-15'
       name: 'Prepare google-services.json'
+      env:
+        BASE64_CONTENT: '${{ secrets.GOOGLE_SERVICES_JSON }}'
+        FILE_PATH: './app/android/google-services.json'
       continue-on-error: true
-      uses: 'timheuer/base64-to-file@v1.1'
-      with:
-        fileName: 'google-services.json'
-        fileDir: './app/android'
-        encodedString: '${{ secrets.GOOGLE_SERVICES_JSON }}'
+      shell: 'bash'
+      run: |-
+        set -euo pipefail
+
+        if [ -z "${BASE64_CONTENT:-}" ]; then
+          echo "BASE64_CONTENT is empty" >&2
+          exit 1
+        fi
+
+        mkdir -p "$(dirname "$FILE_PATH")"
+        if ! printf '%s' "$BASE64_CONTENT" | base64 --decode > "$FILE_PATH" 2>/dev/null; then
+          printf '%s' "$BASE64_CONTENT" | base64 -D > "$FILE_PATH"
+        fi
+        chmod 600 "$FILE_PATH"
+        echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
       if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
     - id: 'step-16'
       name: 'Compile Kotlin (Attempt #1)'
