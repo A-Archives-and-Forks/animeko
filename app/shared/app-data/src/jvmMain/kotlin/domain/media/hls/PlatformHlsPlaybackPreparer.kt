@@ -58,6 +58,7 @@ class PlatformHlsPlaybackPreparer(
 
         val session = try {
             val filterResult = HlsManifestFilter.filter(manifest, baseUri.toString())
+            logger.info("HLS prepare filter result $baseUri is ${filterResult.status}, reason: ${filterResult.reason}, removed groups: ${filterResult.removedGroups}")
             when {
                 filterResult.status == HlsManifestFilterStatus.Filtered -> {
                     LocalHlsPlaylistSession.static(filterResult.content.rewriteMediaPlaylistUris(baseUri))
@@ -187,6 +188,7 @@ private class LocalHlsPlaylistSession(
 
     private fun LocalPlaylistContent.rewriteMasterPlaylistUrisIfNeeded(): LocalPlaylistContent {
         val filterResult = HlsManifestFilter.filter(content, baseUri.toString())
+        logger.info("HLS filter result $baseUri is ${filterResult.status}, reason: ${filterResult.reason}, removed groups: ${filterResult.removedGroups}")
         val rewrittenContent = when {
             filterResult.status == HlsManifestFilterStatus.Filtered -> {
                 filterResult.content.rewriteMediaPlaylistUris(baseUri)
