@@ -9,8 +9,8 @@
 
 package me.him188.ani.app.ui.subject.details
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,8 +36,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
@@ -56,22 +58,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,6 +86,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImagePainter
 import com.kmpalette.rememberPaletteState
+import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import me.him188.ani.app.data.models.subject.RatingInfo
@@ -100,24 +107,27 @@ import me.him188.ani.app.ui.foundation.Tag
 import me.him188.ani.app.ui.foundation.animation.AniAnimatedVisibility
 import me.him188.ani.app.ui.foundation.ifThen
 import me.him188.ani.app.ui.foundation.interaction.WindowDragArea
-import me.him188.ani.app.ui.foundation.interaction.nestedScrollWorkaround
-import me.him188.ani.app.ui.foundation.layout.ConnectedScrollState
+import me.him188.ani.app.ui.foundation.layout.NestedScrollableColumn
+import me.him188.ani.app.ui.foundation.layout.NestedScrollableColumnState
+import me.him188.ani.app.ui.foundation.layout.NestedScrollableScope
 import me.him188.ani.app.ui.foundation.layout.PaddingValuesSides
-import me.him188.ani.app.ui.foundation.layout.connectedScrollContainer
-import me.him188.ani.app.ui.foundation.layout.connectedScrollTarget
 import me.him188.ani.app.ui.foundation.layout.currentWindowAdaptiveInfo1
 import me.him188.ani.app.ui.foundation.layout.only
 import me.him188.ani.app.ui.foundation.layout.paneHorizontalPadding
 import me.him188.ani.app.ui.foundation.layout.paneVerticalPadding
 import me.him188.ani.app.ui.foundation.layout.plus
-import me.him188.ani.app.ui.foundation.layout.rememberConnectedScrollState
+import me.him188.ani.app.ui.foundation.layout.rememberNestedScrollableColumnState
 import me.him188.ani.app.ui.foundation.navigation.BackHandler
 import me.him188.ani.app.ui.foundation.pagerTabIndicatorOffset
 import me.him188.ani.app.ui.foundation.rememberImageViewerHandler
 import me.him188.ani.app.ui.foundation.stateOf
 import me.him188.ani.app.ui.foundation.theme.AniThemeDefaults
+import me.him188.ani.app.ui.foundation.theme.LocalAppChromeHazeState
 import me.him188.ani.app.ui.foundation.theme.LocalThemeSettings
 import me.him188.ani.app.ui.foundation.theme.MaterialThemeFromPaletteAndImage
+import me.him188.ani.app.ui.foundation.theme.appChromeFrostedGlass
+import me.him188.ani.app.ui.foundation.theme.appChromeHazeSource
+import me.him188.ani.app.ui.foundation.theme.isAppChromeFrostedGlassActive
 import me.him188.ani.app.ui.foundation.toComposeImageBitmap
 import me.him188.ani.app.ui.foundation.widgets.BackNavigationIconButton
 import me.him188.ani.app.ui.foundation.widgets.LocalToaster
@@ -300,7 +310,6 @@ private fun SubjectDetailsPage(
     val openLinkFailedPrefix = stringResource(Lang.foundation_richtext_open_failed_prefix)
 
     var showSelectEpisode by rememberSaveable { mutableStateOf(false) }
-    val connectedScrollState = rememberConnectedScrollState()
 
     // image viewer
     val imageViewer = rememberImageViewerHandler()
@@ -391,7 +400,12 @@ private fun SubjectDetailsPage(
             return@MaterialThemeFromPaletteAndImage
         }
 
-        SubjectDetailsLayout(
+        val pagerState = rememberPagerState(
+            initialPage = SubjectDetailsTab.DETAILS.ordinal,
+            pageCount = { 3 },
+        )
+        val nestedScrollableColumnState = rememberNestedScrollableColumnState()
+        SubjectDetailsSingleColumnPage(
             info = state.info,
             seasonTags = {
                 SubjectDetailsDefaults.SeasonTag(
@@ -421,20 +435,43 @@ private fun SubjectDetailsPage(
                     onPlay = onPlay,
                 )
             },
-            connectedScrollState = connectedScrollState,
-            modifier,
+            modifier = modifier,
             showTopBar = showTopBar,
             showBlurredBackground = showBlurredBackground,
             windowInsets = windowInsets,
             navigationIcon = navigationIcon,
             onCoverImageSuccess = onCoverImageSuccess,
             onClickOpenExternal = onClickOpenExternal,
-        ) { paddingValues ->
+            floatingActionButton = {
+                when (SubjectDetailsTab.entries.getOrNull(pagerState.currentPage)) {
+                    SubjectDetailsTab.COMMENTS -> {
+                        ExtendedFloatingActionButton(
+                            text = { Text(stringResource(Lang.subject_details_write_review)) },
+                            icon = {
+                                Icon(Icons.Rounded.AddComment, null)
+                            },
+                            onClick = { state.editableRatingState.requestEdit() },
+                            expanded = !nestedScrollableColumnState.isHeaderScrolledOut,
+                        )
+                    }
+
+                    else -> {}
+                }
+            },
+            tabRow = { isOverlay, visible ->
+                SubjectDetailsContentTabRow(
+                    pagerState, 
+                    modifier = Modifier.ifThen(!isOverlay) {
+                        alpha(if (visible) 1f else 0f)
+                    }
+                )
+            },
+            nestedScrollableColumnState = nestedScrollableColumnState,
+        ) { contentPadding ->
             SubjectDetailsContentPager(
-                paddingValues,
-                connectedScrollState,
-                onClickAddRating = { state.editableRatingState.requestEdit() },
-                detailsTab = { contentPadding ->
+                pagerState,
+                contentPadding,
+                detailsTab = { tabContentPadding ->
                     if (state.info == null) return@SubjectDetailsContentPager
                     CompactDetailsTabContent(
                         state = state,
@@ -443,28 +480,30 @@ private fun SubjectDetailsPage(
                         onClickTag = onClickTag,
                         onShowEpisodeList = { showSelectEpisode = true },
                         modifier = Modifier
-                            .nestedScrollWorkaround(state.detailsTabLazyListState, connectedScrollState)
-                            .nestedScroll(connectedScrollState.nestedScrollConnection),
+                            .nestedScrollWorkaround(state.detailsTabLazyListState),
                         listState = state.detailsTabLazyListState,
-                        contentPadding = contentPadding,
+                        contentPadding = tabContentPadding,
                     )
                 },
-                commentsTab = { contentPadding ->
+                commentsTab = { tabContentPadding ->
                     SubjectDetailsDefaults.SubjectCommentColumn(
                         state = state.subjectCommentState,
                         onClickUrl = onClickCommentUrl,
                         onClickImage = onClickCommentImage,
-                        connectedScrollState,
-                        Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScrollWorkaround(state.commentTabLazyGridState),
                         gridState = state.commentTabLazyGridState,
-                        contentPadding = contentPadding,
+                        contentPadding = tabContentPadding,
+                        // 下拉手势优先交给 NestedScrollableColumn 展开 header;
+                        // 只有整页在最顶部时才启用下拉刷新.
+                        pullToRefreshEnabled = nestedScrollableColumnState.isHeaderFullyVisible,
                     )
                 },
                 discussionsTab = {
                     LazyColumn(
-                        Modifier.fillMaxSize()
-                            // TODO: Add nestedScrollWorkaround when we implement this tab
-                            .nestedScroll(connectedScrollState.nestedScrollConnection),
+                        Modifier.fillMaxSize(),
+                        // TODO: Add nestedScrollWorkaround when we implement this tab
                     ) {
                         item {
                             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -473,10 +512,6 @@ private fun SubjectDetailsPage(
                         }
                     }
                 },
-                Modifier
-                    .fillMaxWidth()
-                    .wrapContentWidth(align = Alignment.CenterHorizontally)
-                    .widthIn(max = MaximumContentWidth),
             )
         }
     }
@@ -508,9 +543,7 @@ private fun PlaceholderSubjectDetailsPage(
         return
     }
 
-    val connectedScrollState = rememberConnectedScrollState()
-
-    SubjectDetailsLayout(
+    SubjectDetailsSingleColumnPage(
         info = subjectInfo,
         seasonTags = {
             SubjectDetailsDefaults.SeasonTag(
@@ -555,8 +588,7 @@ private fun PlaceholderSubjectDetailsPage(
                 modifier = Modifier.placeholder(true),
             )
         },
-        connectedScrollState = connectedScrollState,
-        modifier,
+        modifier = modifier,
         showTopBar = showTopBar,
         showBlurredBackground = false,
         windowInsets = windowInsets,
@@ -578,19 +610,18 @@ private fun ErrorSubjectDetailsPage(
     navigationIcon: @Composable () -> Unit = {},
     onClickOpenExternal: () -> Unit = {},
 ) {
-    SubjectDetailsLayout(
+    SubjectDetailsSingleColumnPage(
         info = subjectInfo,
         seasonTags = { },
         collectionData = { },
         collectionActions = { },
         rating = { },
         selectEpisodeButton = { },
-        connectedScrollState = rememberConnectedScrollState(),
-        modifier,
-        showTopBar,
+        modifier = modifier,
+        showTopBar = showTopBar,
         showBlurredBackground = false,
-        windowInsets,
-        navigationIcon,
+        windowInsets = windowInsets,
+        navigationIcon = navigationIcon,
         onClickOpenExternal = onClickOpenExternal,
     ) { paddingValues ->
         LoadErrorCard(
@@ -610,19 +641,32 @@ private fun ErrorSubjectDetailsPage(
 // region layout
 
 /**
- * 一部番的详情页
+ * 单栏 (compact) 条目详情页布局.
+ *
+ * ### 滚动结构
+ *
+ * header (封面等信息 + [tabRow]) 与 [content] (pager) 位于同一个 [NestedScrollableColumn] 中:
+ * 向上滚动时 header 逐渐滚出布局外, pager 高度随之增大直到占满;
+ * 此后才由 pager 内部的 scrollable 消费滚动; 内部 scrollable 到顶后继续下拉, header 才滚回.
+ *
+ * 当 [tabRow] 的顶边到达顶栏底部 (anchor) 时, 显示粘性面板 (第二个 [TopAppBar] + 第二份 [tabRow]),
+ * 覆盖在内容之上, 起到 pinned 的视觉效果而不阻塞 pager 内部滚动.
+ * 整个滚动区域是毛玻璃的模糊来源, 粘性面板作为其 sibling 应用玻璃效果.
  *
  * @param info `null` 表示没加载完成
+ * @param tabRow pager 的 TabRow. 会被调用两次: 一次随内容滚动, 一次在粘性面板中.
+ * @param content pager 区域, 填满 [NestedScrollableColumn] 的 content slot.
+ * 可通过 [NestedScrollableScope] 使用 [NestedScrollableScope.nestedScrollWorkaround] 为内部
+ * scrollable 接线 (桌面鼠标滚轮).
  */
 @Composable
-fun SubjectDetailsLayout(
+fun SubjectDetailsSingleColumnPage(
     info: SubjectInfo?,
     seasonTags: @Composable () -> Unit,
     collectionData: @Composable () -> Unit,
     collectionActions: @Composable () -> Unit,
     rating: @Composable () -> Unit,
     selectEpisodeButton: @Composable BoxScope.() -> Unit,
-    connectedScrollState: ConnectedScrollState,
     modifier: Modifier = Modifier,
     showTopBar: Boolean = true,
     showBlurredBackground: Boolean = true,
@@ -630,108 +674,184 @@ fun SubjectDetailsLayout(
     navigationIcon: @Composable () -> Unit = {},
     onCoverImageSuccess: (AsyncImagePainter.State.Success) -> Unit = {},
     onClickOpenExternal: () -> Unit = {},
-    content: @Composable (contentPadding: PaddingValues) -> Unit,
+    floatingActionButton: @Composable () -> Unit = {},
+    tabRow: (@Composable (isOverlay: Boolean, visible: Boolean) -> Unit)? = null,
+    nestedScrollableColumnState: NestedScrollableColumnState = rememberNestedScrollableColumnState(),
+    content: @Composable NestedScrollableScope.(contentPadding: PaddingValues) -> Unit,
 ) {
     val backgroundColor = AniThemeDefaults.pageContentBackgroundColor
     val stickyTopBarColor = AniThemeDefaults.navigationContainerColor
-    Scaffold(
-        topBar = {
-            if (showTopBar) {
-                WindowDragArea {
-                    Box {
-                        // 透明背景的, 总是显示
+    val topAppBarActions: @Composable RowScope.() -> Unit = {
+        IconButton(onClickOpenExternal) {
+            Icon(Icons.AutoMirrored.Outlined.OpenInNew, null)
+        }
+    }
+    // 详情页自带一个独立的毛玻璃作用域: 粘性面板模糊其下方滚动的内容.
+    CompositionLocalProvider(LocalAppChromeHazeState provides rememberHazeState()) {
+        val frostedGlassActive = isAppChromeFrostedGlassActive()
+        Scaffold(
+            topBar = {
+                if (showTopBar) {
+                    WindowDragArea {
+                        // 透明背景的, 总是显示. 第二个 (粘性面板) 在 content 区域作为 overlay 绘制,
+                        // 以免 topBar 高度随其出现而变化.
                         TopAppBar(
                             title = {},
                             navigationIcon = navigationIcon,
-                            actions = {
-                                IconButton(onClickOpenExternal) {
-                                    Icon(Icons.AutoMirrored.Outlined.OpenInNew, null)
-                                }
-                            },
+                            actions = topAppBarActions,
                             colors = AniThemeDefaults.topAppBarColors().copy(containerColor = Color.Transparent),
                             windowInsets = windowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
                         )
+                    }
+                }
+            },
+            modifier = modifier,
+            floatingActionButton = floatingActionButton,
+            contentWindowInsets = windowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+            containerColor = backgroundColor,
+        ) { scaffoldPadding ->
+            // 这个页面比较特殊. 背景需要绘制到 TopBar 等区域以内, 也就是要无视 scaffoldPadding.
 
-                        // 有背景, 仅在滚动一段距离后使用
-                        AniAnimatedVisibility(connectedScrollState.isScrolledTop) {
-                            TopAppBar(
-                                title = {
-                                    Text(
-                                        info?.displayName ?: "",
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
+            // 在背景之上显示的封面和标题等信息
+            val headerContentPadding = scaffoldPadding.only(PaddingValuesSides.Horizontal + PaddingValuesSides.Top)
+            // 从 tab row 开始的区域
+            val remainingContentPadding = scaffoldPadding.only(PaddingValuesSides.Horizontal)
+
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                var tabRowHeightPx by remember { mutableStateOf(0) }
+                
+                // 粘性面板: 第二个 TopAppBar + 第二份 TabRow.
+                // 作为模糊来源的 sibling 绘制在其上方, 毛玻璃可采样到下方滚动的内容.
+                val density = LocalDensity.current
+                val anchorHeightPx = rememberUpdatedState(
+                    with(density) { scaffoldPadding.calculateTopPadding().roundToPx() },
+                )
+                // 触发条件: header 内的 tabRow 顶边滚动到顶栏底部 (anchor).
+                val stickyPanelVisible by remember(nestedScrollableColumnState) {
+                    derivedStateOf {
+                        val state = nestedScrollableColumnState
+                        val threshold = state.headerHeight - tabRowHeightPx - anchorHeightPx.value
+                        state.headerHeight > 0 && state.scrolledOffset > 0f && state.scrolledOffset >= threshold
+                    }
+                }
+
+                NestedScrollableColumn(
+                    header = {
+                        Column(Modifier.fillMaxWidth()) {
+                            Box {
+                                // 虚化渐变背景, 需要绘制到 scaffoldPadding 以外区域
+                                if (showBlurredBackground) {
+                                    SubjectBlurredBackground(
+                                        coverImageUrl = info?.imageLarge,
+                                        Modifier.matchParentSize(),
+                                        backgroundColor = backgroundColor,
                                     )
-                                },
-                                navigationIcon = navigationIcon,
-                                actions = {
-                                    IconButton(onClickOpenExternal) {
-                                        Icon(Icons.AutoMirrored.Outlined.OpenInNew, null)
-                                    }
-                                },
-                                colors = AniThemeDefaults.topAppBarColors(containerColor = stickyTopBarColor),
-                                windowInsets = windowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
-                            )
+                                }
+
+                                // 标题和封面, 以及收藏数据, 可向上滑动
+                                // 需要满足 scaffoldPadding 的 horizontal 和 top
+                                Column(
+                                    Modifier
+                                        .padding(headerContentPadding)
+                                        .consumeWindowInsets(headerContentPadding),
+                                ) {
+                                    val windowSizeClass = currentWindowAdaptiveInfo1().windowSizeClass
+                                    SubjectDetailsHeader(
+                                        info,
+                                        info?.imageLarge,
+                                        seasonTags = seasonTags,
+                                        collectionData = collectionData,
+                                        collectionAction = collectionActions,
+                                        selectEpisodeButton = selectEpisodeButton,
+                                        rating = rating,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .wrapContentWidth(align = Alignment.CenterHorizontally)
+                                            .widthIn(max = MaximumContentWidth)
+                                            .fillMaxWidth()
+                                            .ifThen(!showTopBar) { padding(top = windowSizeClass.paneVerticalPadding) }
+                                            .padding(horizontal = windowSizeClass.paneHorizontalPadding),
+                                        onCoverImageSuccess = onCoverImageSuccess,
+                                    )
+                                }
+                            }
+
+                            if (tabRow != null) {
+                                Box(
+                                    Modifier
+                                        .onSizeChanged { tabRowHeightPx = it.height }
+                                        .padding(remainingContentPadding)
+                                        .fillMaxWidth(),
+                                ) {
+                                    tabRow(false, !stickyPanelVisible)
+                                }
+                            }
+                        }
+                    },
+                    content = {
+                        content(remainingContentPadding)
+                    },
+                    // 毛玻璃的模糊来源: 覆盖整个滚动区域 (header 背景 + tabRow + pager 内容).
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .appChromeHazeSource(backgroundColor = backgroundColor),
+                    state = nestedScrollableColumnState,
+                )
+
+                if (showTopBar || tabRow != null) {
+                    // 面板底色/毛玻璃按分段应用: TopAppBar 段随 fade 渐入渐出,
+                    // TabRow 段直接 snap, 与 header 中 TabRow (同帧 alpha 隐藏/显示) 无缝交接.
+                    val panelBackgroundModifier = Modifier
+                        .appChromeFrostedGlass(
+                            enabled = frostedGlassActive,
+                            containerColor = stickyTopBarColor,
+                        )
+                        .ifThen(!frostedGlassActive) { background(stickyTopBarColor) }
+
+                    Column(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth(),
+                    ) {
+                        if (showTopBar) {
+                            AniAnimatedVisibility(
+                                stickyPanelVisible,
+                                enter = fadeIn(),
+                                exit = fadeOut(),
+                            ) {
+                                WindowDragArea {
+                                    TopAppBar(
+                                        title = {
+                                            Text(
+                                                info?.displayName ?: "",
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        },
+                                        modifier = panelBackgroundModifier,
+                                        navigationIcon = navigationIcon,
+                                        actions = topAppBarActions,
+                                        colors = AniThemeDefaults.topAppBarColors().copy(containerColor = Color.Transparent),
+                                        windowInsets = windowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                                    )
+                                }
+                            }
+                        }
+
+                        if (tabRow != null && stickyPanelVisible) {
+                            Box(
+                                panelBackgroundModifier
+                                    .padding(remainingContentPadding)
+                                    .fillMaxWidth(),
+                            ) {
+                                tabRow(true, stickyPanelVisible)
+                            }
                         }
                     }
                 }
-            }
-        },
-        modifier = modifier,
-        contentWindowInsets = windowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
-        containerColor = backgroundColor,
-    ) { scaffoldPadding ->
-        // 这个页面比较特殊. 背景需要绘制到 TopBar 等区域以内, 也就是要无视 scaffoldPadding.
-
-        // 在背景之上显示的封面和标题等信息
-        val headerContentPadding = scaffoldPadding.only(PaddingValuesSides.Horizontal + PaddingValuesSides.Top)
-        // 从 tab row 开始的区域
-        val remainingContentPadding = scaffoldPadding.only(PaddingValuesSides.Horizontal)
-
-        Box(
-            Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Column(Modifier.fillMaxHeight()) {
-                Box(Modifier.connectedScrollContainer(connectedScrollState)) {
-                    // 虚化渐变背景, 需要绘制到 scaffoldPadding 以外区域
-                    if (showBlurredBackground) {
-                        SubjectBlurredBackground(
-                            coverImageUrl = info?.imageLarge,
-                            Modifier.matchParentSize(),
-                            backgroundColor = backgroundColor,
-                        )
-                    }
-
-                    // 标题和封面, 以及收藏数据, 可向上滑动
-                    // 需要满足 scaffoldPadding 的 horizontal 和 top
-                    Column(
-                        Modifier
-                            .padding(headerContentPadding)
-                            .consumeWindowInsets(headerContentPadding),
-                    ) {
-                        val windowSizeClass = currentWindowAdaptiveInfo1().windowSizeClass
-                        SubjectDetailsHeader(
-                            info,
-                            info?.imageLarge,
-                            seasonTags = seasonTags,
-                            collectionData = collectionData,
-                            collectionAction = collectionActions,
-                            selectEpisodeButton = selectEpisodeButton,
-                            rating = rating,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .wrapContentWidth(align = Alignment.CenterHorizontally)
-                                .widthIn(max = MaximumContentWidth)
-                                .connectedScrollTarget(connectedScrollState)
-                                .fillMaxWidth()
-                                .ifThen(!showTopBar) { padding(top = windowSizeClass.paneVerticalPadding) }
-                                .padding(horizontal = windowSizeClass.paneHorizontalPadding),
-                            onCoverImageSuccess = onCoverImageSuccess,
-                        )
-                    }
-                }
-
-                content(remainingContentPadding)
             }
         }
     }
@@ -742,110 +862,86 @@ fun SubjectDetailsLayout(
 // region content pager
 
 /**
- * Pager 页面
+ * Pager 的 TabRow. 在 [SubjectDetailsSingleColumnPage] 中被调用两次:
+ * 一次随内容滚动, 一次在粘性面板中 (背景由面板提供).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
+private fun SubjectDetailsContentTabRow(
+    pagerState: PagerState,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        TabRow(
+            selectedTabIndex = pagerState.currentPage,
+            modifier = Modifier.widthIn(max = SubjectDetailsDefaults.TabRowWidth),
+            indicator = @Composable { tabPositions ->
+                TabRowDefaults.PrimaryIndicator(
+                    Modifier.pagerTabIndicatorOffset(pagerState, tabPositions),
+                )
+            },
+            containerColor = Color.Transparent,
+            contentColor = TabRowDefaults.secondaryContentColor,
+            divider = {},
+        ) {
+            SubjectDetailsTab.entries.forEachIndexed { index, tabId ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    modifier = Modifier.widthIn(max = SubjectDetailsDefaults.TabWidth),
+                    onClick = {
+                        scope.launch { pagerState.animateScrollToPage(index) }
+                    },
+                    text = {
+                        Text(text = renderSubjectDetailsTab(tabId))
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Pager 页面 (不含 TabRow, 见 [SubjectDetailsContentTabRow]).
+ * 填满 [NestedScrollableColumn] 的 content slot.
+ */
+@Composable
 private fun SubjectDetailsContentPager(
-    paddingValues: PaddingValues,
-    connectedScrollState: ConnectedScrollState,
-    onClickAddRating: () -> Unit,
+    pagerState: PagerState,
+    contentPadding: PaddingValues,
     detailsTab: @Composable (contentPadding: PaddingValues) -> Unit,
     commentsTab: @Composable (contentPadding: PaddingValues) -> Unit,
     discussionsTab: @Composable (contentPadding: PaddingValues) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val backgroundColor = AniThemeDefaults.pageContentBackgroundColor
-    val stickyTopBarColor = AniThemeDefaults.navigationContainerColor
-
-    val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(
-        initialPage = SubjectDetailsTab.DETAILS.ordinal,
-        pageCount = { 3 },
-    )
-
-    Scaffold(
-        Modifier,
-        floatingActionButton = {
-            when (SubjectDetailsTab.entries.getOrNull(pagerState.currentPage)) {
-                SubjectDetailsTab.DETAILS -> {}
-                SubjectDetailsTab.COMMENTS -> {
-                    ExtendedFloatingActionButton(
-                        text = { Text(stringResource(Lang.subject_details_write_review)) },
-                        icon = {
-                            Icon(Icons.Rounded.AddComment, null)
-                        },
-                        onClickAddRating,
-                        expanded = !connectedScrollState.isScrolledTop,
-                    )
-                }
-
-                SubjectDetailsTab.DISCUSSIONS -> {}
-                null -> {}
-            }
-        },
-    ) { _ -> // ignore window insets
-        Column(
-            modifier
-                .fillMaxHeight()
-                .padding(paddingValues)
-                .consumeWindowInsets(paddingValues),
-        ) {
-            val tabContainerColor by animateColorAsState(
-                if (connectedScrollState.isScrolledTop) stickyTopBarColor else backgroundColor,
-                tween(),
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(tabContainerColor),
-                contentAlignment = Alignment.Center,
-            ) {
-                TabRow(
-                    selectedTabIndex = pagerState.currentPage,
-                    modifier = Modifier.widthIn(max = SubjectDetailsDefaults.TabRowWidth),
-                    indicator = @Composable { tabPositions ->
-                        TabRowDefaults.PrimaryIndicator(
-                            Modifier.pagerTabIndicatorOffset(pagerState, tabPositions),
-                        )
-                    },
-                    containerColor = tabContainerColor,
-                    contentColor = TabRowDefaults.secondaryContentColor,
-                    divider = {},
-                ) {
-                    SubjectDetailsTab.entries.forEachIndexed { index, tabId ->
-                        Tab(
-                            selected = pagerState.currentPage == index,
-                            modifier = Modifier.widthIn(max = SubjectDetailsDefaults.TabWidth),
-                            onClick = {
-                                scope.launch { pagerState.animateScrollToPage(index) }
-                            },
-                            text = {
-                                Text(text = renderSubjectDetailsTab(tabId))
-                            },
-                        )
-                    }
-                }
-            }
-
-            HorizontalPager(
-                state = pagerState,
-                Modifier.fillMaxHeight(),
-                userScrollEnabled = LocalPlatform.current.isMobile(),
-                verticalAlignment = Alignment.Top,
-            ) { index ->
-                val type = SubjectDetailsTab.entries[index]
-                Column(Modifier.padding()) {
-                    val panePaddingValues =
-                        PaddingValues(
-                            bottom = currentWindowAdaptiveInfo1().windowSizeClass.paneVerticalPadding,
-                        ).plus(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).asPaddingValues())
-                    when (type) {
-                        SubjectDetailsTab.DETAILS -> detailsTab(panePaddingValues)
-                        SubjectDetailsTab.COMMENTS -> commentsTab(panePaddingValues)
-                        SubjectDetailsTab.DISCUSSIONS -> discussionsTab(panePaddingValues)
-                    }
+    Column(
+        modifier
+            .fillMaxHeight()
+            .padding(contentPadding)
+            .consumeWindowInsets(contentPadding)
+            .fillMaxWidth()
+            .wrapContentWidth(align = Alignment.CenterHorizontally)
+            .widthIn(max = MaximumContentWidth),
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            Modifier.fillMaxHeight(),
+            userScrollEnabled = LocalPlatform.current.isMobile(),
+            verticalAlignment = Alignment.Top,
+        ) { index ->
+            val type = SubjectDetailsTab.entries[index]
+            Column(Modifier.padding()) {
+                val panePaddingValues =
+                    PaddingValues(
+                        bottom = currentWindowAdaptiveInfo1().windowSizeClass.paneVerticalPadding,
+                    ).plus(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).asPaddingValues())
+                when (type) {
+                    SubjectDetailsTab.DETAILS -> detailsTab(panePaddingValues)
+                    SubjectDetailsTab.COMMENTS -> commentsTab(panePaddingValues)
+                    SubjectDetailsTab.DISCUSSIONS -> discussionsTab(panePaddingValues)
                 }
             }
         }

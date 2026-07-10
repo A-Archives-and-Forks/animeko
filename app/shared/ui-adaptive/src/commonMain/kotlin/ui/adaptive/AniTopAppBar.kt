@@ -44,9 +44,11 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -66,8 +68,11 @@ import me.him188.ani.app.ui.foundation.layout.isWidthAtLeastExpanded
 import me.him188.ani.app.ui.foundation.layout.isWidthAtLeastMedium
 import me.him188.ani.app.ui.foundation.layout.paddingIfNotEmpty
 import me.him188.ani.app.ui.foundation.layout.paneHorizontalPadding
+import me.him188.ani.app.ui.foundation.rememberCurrentTopAppBarContainerColor
 import me.him188.ani.app.ui.foundation.session.SelfAvatar
 import me.him188.ani.app.ui.foundation.theme.AniThemeDefaults
+import me.him188.ani.app.ui.foundation.theme.appChromeFrostedGlass
+import me.him188.ani.app.ui.foundation.theme.isAppChromeFrostedGlassActive
 import me.him188.ani.app.ui.foundation.widgets.BackNavigationIconButton
 import me.him188.ani.app.ui.user.TestSelfInfoUiState
 import me.him188.ani.utils.platform.annotations.TestOnly
@@ -111,8 +116,24 @@ fun AniTopAppBar(
         .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal), // You would like to add only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
     scrollBehavior: TopAppBarScrollBehavior? = null,
     size: TopAppBarSize = TopAppBarSize.SMALL,
+    // 当调用方自行为包含此 app bar 的更大区域应用毛玻璃效果时 (例如 CollectionPage 的 tab row), 传入 false 以避免重复应用.
+    enableFrostedGlass: Boolean = true,
 ) {
     val windowSizeClass = currentWindowAdaptiveInfo1().windowSizeClass
+    val frostedGlassActive = enableFrostedGlass && isAppChromeFrostedGlassActive()
+    val containerColor by rememberCurrentTopAppBarContainerColor(colors, scrollBehavior)
+    val appBarModifier = modifier.appChromeFrostedGlass(
+        enabled = frostedGlassActive,
+        containerColor = containerColor,
+    )
+    val appBarColors = if (frostedGlassActive) {
+        colors.copy(
+            containerColor = Color.Transparent,
+            scrolledContainerColor = Color.Transparent,
+        )
+    } else {
+        colors
+    }
 
     val platformWindow = LocalPlatformWindow.current
     WindowDragArea(
@@ -192,12 +213,12 @@ fun AniTopAppBar(
                             title()
                         }
                     },
-                    modifier = modifier,
+                    modifier = appBarModifier,
                     navigationIcon = navigationIcon,
                     actions = actionsDecorated,
                     expandedHeight = expandedHeight,
                     windowInsets = windowInsets,
-                    colors = colors,
+                    colors = appBarColors,
                     scrollBehavior = scrollBehavior,
                 )
             }
@@ -209,12 +230,12 @@ fun AniTopAppBar(
                             title()
                         }
                     },
-                    modifier = modifier,
+                    modifier = appBarModifier,
                     navigationIcon = navigationIcon,
                     actions = actionsDecorated,
                     collapsedHeight = expandedHeight,
                     windowInsets = windowInsets,
-                    colors = colors,
+                    colors = appBarColors,
                     scrollBehavior = scrollBehavior,
                 )
             }
@@ -226,12 +247,12 @@ fun AniTopAppBar(
                             title()
                         }
                     },
-                    modifier = modifier,
+                    modifier = appBarModifier,
                     navigationIcon = navigationIcon,
                     actions = actionsDecorated,
                     collapsedHeight = expandedHeight,
                     windowInsets = windowInsets,
-                    colors = colors,
+                    colors = appBarColors,
                     scrollBehavior = scrollBehavior,
                 )
             }
