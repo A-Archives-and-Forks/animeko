@@ -43,6 +43,27 @@ $DESK key return            # also: tab, esc, space, delete, arrows
 $DESK quit
 ```
 
+### Injected input (preferred): no cursor move, no focus steal
+
+`agent-attach` puts a tiny `-javaagent` (source: `scripts/input-agent/InputAgent.java`) into the .app's jpackage cfg; it injects synthetic AWT events in-process via a loopback socket — the system cursor never moves, the app need not be frontmost, and no Accessibility permission is involved. Validated end-to-end on the real Ani Compose window 2026-07-10 (clicks closed a dialog, switched nav, opened search; `type` inserted text into the search TextField — all while another app was frontmost). Injected events land on the Skia canvas (`inject` replies `-> org.jetbrains.skiko.SkiaLayer$1`) and Compose routes them internally. Ani draws its own window chrome, so `info` reports content == frame:
+**inject coordinates = window points = screenshot PNG px / 2, no title-bar offset**.
+
+```bash
+$DESK agent-attach          # once per built .app, BEFORE launch
+$DESK launch
+$DESK inject info           # window bounds + content-area origin/size
+$DESK inject click 300 200  # window-CONTENT points = window points minus title bar (~28pt);
+                            # screenshot PNG pixel / 2, then subtract (content.y - frame.y)
+$DESK inject type hello     # goes to focus owner, else last injected-click target
+$DESK inject key 10         # AWT keycodes: 10=Enter, 27=Esc, 9=Tab, 37-40=arrows
+```
+
+- `inject type` goes to Compose's internal focus, which follows injected clicks — **click INTO the
+  text field
+  first** (opening a screen is not enough: after opening search, typing did nothing until the field itself was clicked).
+- For window-id screenshots WITHOUT activating/normalizing the window (keeps the app in the background), capture directly: `swift scripts/find_window_id.swift --pid $(pgrep -xn Ani)` then `screencapture -x -l <id> out.png`. These PNGs include a shadow border (e.g. 3016x1936 for a 1440x900 window — subtract (PNG_w−2880)/2 = 68px per side before converting px/2 → points).
+- Fall back to `click`/`type`/cliclick below only if injection misbehaves. Injected hover (`inject move`) drives Compose hover states from event coordinates, but anything reading the REAL cursor position will disagree.
+
 - **Screenshots capture the window by CGWindowID** (via `find_window_id.swift`), so they show the app's own content even when other windows overlap it — the user may be actively using the desktop. The AppleScript step first normalizes the window to position (40,80) size 1440x900 points.
 - **Coordinate mapping**: retina PNGs are 2x, so `window point = PNG pixel / 2` (1440x900 window → 2880x1800 PNG; sanity-check your math against that).
 - **Click immediately after a fresh screenshot**: toasts and update dialogs auto-dismiss, and a click computed from a stale screenshot lands on whatever is underneath. `click` prints the AX element it hit (e.g. `scroll area 1 of group 1 …`) — read it to confirm the intended target.

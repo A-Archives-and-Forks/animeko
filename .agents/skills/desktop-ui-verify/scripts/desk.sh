@@ -145,6 +145,46 @@ OSA
     python3 "$SCRIPT_DIR/frame_diff.py" "$@"
     ;;
 
+  agent-attach)
+    # Compile the input agent and register it in the .app's jpackage cfg so the next
+    # launch starts it. Injected input needs NO Accessibility permission, never moves
+    # the system cursor, and never steals focus.
+    app="${1:-$("$SCRIPT_DIR/find_desktop_app.sh")}"
+    port="${ANI_INPUT_AGENT_PORT:-7788}"
+    jar="$OUT_DIR/inputagent.jar"
+    if [[ ! -f "$jar" || "$SCRIPT_DIR/input-agent/InputAgent.java" -nt "$jar" ]]; then
+      mkdir -p "$OUT_DIR/input-agent-build"
+      javac -d "$OUT_DIR/input-agent-build" "$SCRIPT_DIR/input-agent/InputAgent.java"
+      printf 'Premain-Class: InputAgent\n' > "$OUT_DIR/input-agent-build/manifest.txt"
+      (cd "$OUT_DIR/input-agent-build" && jar cfm "$jar" manifest.txt InputAgent*.class)
+    fi
+    cfg="$(ls "$app"/Contents/app/*.cfg 2>/dev/null | head -1)"
+    [[ -n "$cfg" ]] || { echo "no jpackage cfg found under $app/Contents/app" >&2; exit 1; }
+    # keep the jar inside the .app ($APPDIR) so the cfg never points at a
+    # cleaned-up temp file, which would make the app fail to launch
+    cp "$jar" "$app/Contents/app/inputagent.jar"
+    line='java-options=-javaagent:$APPDIR/inputagent.jar='"$port"
+    grep -qF -- "$line" "$cfg" || printf '%s\n' "$line" >> "$cfg"
+    echo "agent attached inside $app (port $port; takes effect on next launch)"
+    ;;
+
+  inject)
+    # Send one protocol line to the in-app input agent; see input-agent/InputAgent.java.
+    # click/press/release/move x y are window-CONTENT points (below title bar; use
+    # `inject info` to get the content origin for converting screenshot coordinates).
+    [[ $# -ge 1 ]] || { echo "usage: desk.sh inject click|press|release|move|type|key|info [args...]" >&2; exit 2; }
+    port="${ANI_INPUT_AGENT_PORT:-7788}" cmdline="$*" python3 - <<'PY'
+import os, socket, sys
+try:
+    s = socket.create_connection(("127.0.0.1", int(os.environ["port"])), timeout=5)
+except OSError as e:
+    sys.exit(f"cannot reach input agent on port {os.environ['port']} ({e}); run desk.sh agent-attach and relaunch the app")
+f = s.makefile("rw")
+f.write(os.environ["cmdline"] + "\n"); f.flush()
+print(f.readline().strip())
+PY
+    ;;
+
   quit)
     "$SCRIPT_DIR/quit_desktop_app.sh" "${1:-$PROC}"
     ;;
@@ -177,6 +217,11 @@ click/type/key/screenshot need macOS Accessibility permission for the terminal r
   record-start [out.mov]      start recording in background; interact, then record-stop
   record-stop                 stop recording, print the video path
   frames <video> [args]       analyze a recording for transient glitches (frame_diff.py; --help for options)
+  agent-attach [app]          compile the input agent and register it in the .app cfg (next launch)
+  inject <cmd> [args]         injected input via the in-app agent: click/press/release/move <x> <y>
+                              (window-CONTENT points), type <text>, key <awt-keycode>, info.
+                              PREFERRED over click/type: no cursor move, no focus steal, works
+                              in background, no Accessibility permission needed.
   quit [process]              quit the app (graceful, then pkill)
   logs [n]                    tail newest app log (Application Support .../logs, or test-sandbox for dev runs)
 EOF
