@@ -44,6 +44,7 @@ dependencies {
     // probe_video: 用与桌面 App 相同的 VLC 播放器真实播放视频
     implementation(libs.mediamp.api)
     implementation(libs.mediamp.vlc)
+    implementation(libs.mediamp.mpv)
     implementation(libs.vlcj)
     implementation(compose.desktop.currentOs)
 

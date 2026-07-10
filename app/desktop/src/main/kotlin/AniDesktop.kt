@@ -43,7 +43,6 @@ import com.sun.jna.platform.win32.Advapi32Util
 import com.sun.jna.platform.win32.WinReg
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
@@ -51,7 +50,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import me.him188.ani.app.data.models.preference.DarkMode
 import me.him188.ani.app.data.models.preference.UISettings
 import me.him188.ani.app.data.repository.SavedWindowState
@@ -110,10 +108,12 @@ import me.him188.ani.utils.analytics.Analytics
 import me.him188.ani.utils.analytics.AnalyticsConfig
 import me.him188.ani.utils.analytics.AnalyticsImpl
 import me.him188.ani.utils.analytics.AnalyticsSecrets
+import me.him188.ani.utils.logging.debug
 import me.him188.ani.utils.logging.error
 import me.him188.ani.utils.logging.info
 import me.him188.ani.utils.logging.logger
 import me.him188.ani.utils.logging.trace
+import me.him188.ani.utils.logging.warn
 import me.him188.ani.utils.platform.currentPlatform
 import me.him188.ani.utils.platform.currentPlatformDesktop
 import me.him188.ani.utils.platform.isMacOS
@@ -121,6 +121,7 @@ import me.him188.ani.utils.platform.isWindows
 import org.jetbrains.compose.resources.painterResource
 import org.koin.core.context.startKoin
 import org.openani.mediamp.ffmpeg.FFmpegKit
+import org.openani.mediamp.mpv.MPVHandle
 import org.openani.mediamp.vlc.VlcMediampPlayer
 import java.awt.Desktop
 import java.awt.Frame
@@ -322,43 +323,75 @@ object AniDesktop {
         val loadLibraryJob = coroutineScope.launch(Dispatchers.IO) {
             try {
                 AnitorrentLibraryLoader.loadLibraries()
+                logger.info { "Anitorrent is loaded." }
             } catch (e: Throwable) {
                 logger.error(e) { "Failed to load anitorrent libraries" }
             }
 
+            // 为什么是这个目录?
+            // CMP 打包 task 会把 resource dir 放到 jar 包的目录里
+            // 我们 hack 打包 task 把包含 runtime library 的 jar 包解压到那一堆 jar 包的目录
+            val composeResDir = File(System.getProperty("compose.application.resources.dir"))
+                .parentFile.absolutePath
+
             try {
                 if (currentProcessName()?.contains("java") == true) {
-                    // dev 环境将 runtime libraries 解压到 temp 里
                     FFmpegKit.useDefaultRuntimeLibraryDirectory()
                 } else {
-                    // 为什么是这个目录?
-                    // CMP 打包 task 会把 resource dir 放到 jar 包的目录里
-                    // 我们 hack 打包 task 把包含 runtime library 的 jar 包解压到那一堆 jar 包的目录
-                    val userDir = File(System.getProperty("compose.application.resources.dir"))
-                        .parentFile.absolutePath
-                    FFmpegKit.setRuntimeLibraryDirectory(userDir, false)
+                    FFmpegKit.setRuntimeLibraryDirectory(composeResDir, false)
                 }
+                logger.info { "FFmpegKit is loaded." }
             } catch (e: Throwable) {
-                logger.error(e) { "Failed to load FFmpeg and mpv." }
+                logger.error(e) { "Failed to load FFmpeg component of mediamp." }
             }
+
+            if (currentPlatformDesktop().usesMpv()) {
+                try {
+                    if (currentProcessName()?.contains("java") == true) {
+                        MPVHandle.useDefaultRuntimeLibraryDirectory()
+                    } else {
+                        MPVHandle.setRuntimeLibraryDirectory(composeResDir, false)
+                    }
+                    val mpvLogger = logger<MPVHandle>()
+                    // mpv_log_level in https://github.com/mpv-player/mpv/blob/master/include/mpv/client.h
+                    MPVHandle.setLogHandler {
+                        if (it.level in 1..20) {
+                            mpvLogger.error { "[mpv:${it.prefix}:${it.level}] ${it.line}" }
+                        } else if (it.level <= 30) {
+                            mpvLogger.warn { "[mpv:${it.prefix}:${it.level}] ${it.line}" }
+                        } else if (it.level <= 40) {
+                            mpvLogger.info { "[mpv:${it.prefix}:${it.level}] ${it.line}" }
+                        } else if (it.level <= 50) {
+                            mpvLogger.debug { "[mpv:${it.prefix}:${it.level}] ${it.line}" }
+                        } else {
+                            mpvLogger.trace { "[mpv:${it.prefix}:${it.level}] ${it.line}" }
+                        }
+                    }
+                } catch (e: Throwable) {
+                    logger.error(e) { "Failed to load libmpv component of mediamp." }
+                }
+                logger.info { "libmpv is loaded." }
+            } else {
+                VlcMediampPlayer.prepareLibraries()
+            }
+
         }
 
         // Initialize CEF application.
         coroutineScope.launch {
-            logger.info { "[JCEF init] waiting for anitorrent load" }
+            logger.info { "[JCEF init] awaiting anitorrent, FFmpegKit and VLC/libmpv loaded." }
             try {
                 analyticsInitializer.join()
                 loadLibraryJob.join()
             } catch (_: Throwable) {
             }
-            logger.info { "[JCEF init] anitorrent loaded" }
             // Load anitorrent libraries before JCEF, so they won't load at the same time.
             // We suspect concurrent loading of native libraries may cause some issues #1121.
 
             val proxySettings = koin.koin.get<ProxyProvider>()
                 .proxy.first()
 
-            logger.info { "[JCEF init] Calling AniCefApp.initialize" }
+            logger.info { "[JCEF init] initializing AniCefApp." }
 
             AniCefApp.initialize(
                 logDir = dataDir.toFile().resolve("logs"),
@@ -368,18 +401,7 @@ object AniDesktop {
                 proxyAuthPassword = proxySettings?.authorization?.password,
             )
 
-            logger.info { "[JCEF init] Initialize done, now prepare FFmpeg libraries" }
-
-            // 预先加载 VLC, https://github.com/open-ani/ani/issues/618
-            kotlin.runCatching {
-                withContext(Dispatchers.IO) {
-                    VlcMediampPlayer.prepareLibraries()
-                }
-            }.onFailure {
-                logger.error(it) { "Failed to prepare VLC" }
-            }
-
-            logger.info { "[JCEF init] VLC libraries prepared." }
+            logger.info { "[JCEF init] AniCefApp is initialized." }
         }
 
         coroutineScope.launch {

@@ -32,11 +32,11 @@ dependencies {
     implementation(libs.compose.components.resources)
     implementation(libs.compose.native.tray)
     implementation(libs.log4j.core)
-    implementation(libs.vlcj)
     implementation(libs.jsystemthemedetector)
     implementation(libs.bytebuddy.agent)
     implementation(libs.bytebuddy)
     implementation(libs.mediamp.ffmpeg.desktop)
+
     when (val triple = getOsTriple()) {
         "windows-x64" -> runtimeOnly(libs.mediamp.ffmpeg.runtime.windows.x64)
         "linux-x64" -> runtimeOnly(libs.mediamp.ffmpeg.runtime.linux.x64)
@@ -44,6 +44,23 @@ dependencies {
         "macos-arm64" -> runtimeOnly(libs.mediamp.ffmpeg.runtime.macos.arm64)
         else -> throw UnsupportedOperationException("Unknown os: $triple")
     }
+
+    if (getLocalProperty("ani.build.mediamp.path") != null) {
+        runtimeOnly(libs.mediamp.mpv) {
+            capabilities {
+                requireCapability("org.openani.mediamp:mediamp-mpv-runtime-${getOsTriple()}")
+            }
+        }
+    } else {
+        when (val triple = getOsTriple()) {
+            "windows-x64" -> runtimeOnly(libs.mediamp.mpv.runtime.windows.x64)
+            "macos-arm64" -> runtimeOnly(libs.mediamp.mpv.runtime.macos.arm64)
+            else -> {}
+        }
+    }
+
+    // vlcj 依赖里没有 native libraries，依赖是手动放的
+    implementation(libs.vlcj)
 }
 
 // workaround for compose limitation
