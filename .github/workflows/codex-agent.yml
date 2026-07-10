@@ -67,13 +67,14 @@ jobs:
     steps:
       - id: check
         env:
-          GH_TOKEN: ${{ secrets.OPENANI_BOT_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          BOT_TOKEN: ${{ secrets.OPENANI_BOT_TOKEN }}
           ACTOR: ${{ github.event.sender.login }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          test -n "${GH_TOKEN:-}" || { echo "::error::OPENANI_BOT_TOKEN is not configured"; exit 1; }
-          BOT_LOGIN=$(gh api user --jq .login)
+          test -n "${BOT_TOKEN:-}" || { echo "::error::OPENANI_BOT_TOKEN is not configured"; exit 1; }
+          BOT_LOGIN=$(GH_TOKEN="$BOT_TOKEN" gh api user --jq .login)
           test "$(printf '%s' "$BOT_LOGIN" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$GIT_NAME" | tr '[:upper:]' '[:lower:]')" || {
             echo "::error::OPENANI_BOT_TOKEN authenticates as $BOT_LOGIN, expected $GIT_NAME"
             exit 1
