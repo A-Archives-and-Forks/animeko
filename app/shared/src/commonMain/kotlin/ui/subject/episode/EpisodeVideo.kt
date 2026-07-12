@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.outlined.Analytics
 import androidx.compose.material.icons.rounded.DisplaySettings
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.MoreVert
@@ -81,6 +82,8 @@ import me.him188.ani.app.ui.lang.subject_episode_fast_forward_85_seconds
 import me.him188.ani.app.ui.lang.subject_episode_more_options
 import me.him188.ani.app.ui.lang.subject_episode_preview_mode
 import me.him188.ani.app.ui.lang.subject_episode_select_media_source
+import me.him188.ani.app.ui.lang.video_player_stats_title_hide
+import me.him188.ani.app.ui.lang.video_player_stats_title_show
 import me.him188.ani.app.ui.mediafetch.TestMediaSourceResultListPresentation
 import me.him188.ani.app.ui.mediafetch.ViewKind
 import me.him188.ani.app.ui.mediafetch.rememberTestMediaSelectorState
@@ -103,6 +106,7 @@ import me.him188.ani.app.videoplayer.ui.NoOpPlaybackSpeedController
 import me.him188.ani.app.videoplayer.ui.NoOpVideoAspectRatio
 import me.him188.ani.app.videoplayer.ui.PlaybackSpeedControllerState
 import me.him188.ani.app.videoplayer.ui.PlayerControllerState
+import me.him188.ani.app.videoplayer.ui.PlayerStatsOverlay
 import me.him188.ani.app.videoplayer.ui.VideoAspectRatioControllerState
 import me.him188.ani.app.videoplayer.ui.VideoPlayer
 import me.him188.ani.app.videoplayer.ui.VideoScaffold
@@ -128,6 +132,7 @@ import me.him188.ani.app.videoplayer.ui.progress.SubtitleSwitcher
 import me.him188.ani.app.videoplayer.ui.progress.rememberMediaProgressFramePreviewState
 import me.him188.ani.app.videoplayer.ui.progress.rememberMediaProgressSliderState
 import me.him188.ani.app.videoplayer.ui.rememberAlwaysOnRequester
+import me.him188.ani.app.videoplayer.ui.rememberPlayerStatsState
 import me.him188.ani.app.videoplayer.ui.rememberVideoControllerState
 import me.him188.ani.app.videoplayer.ui.rememberVideoSideSheetsController
 import me.him188.ani.app.videoplayer.ui.top.PlayerTopBar
@@ -197,6 +202,8 @@ internal fun EpisodeVideoImpl(
 ) {
     // Don't rememberSavable. 刻意让每次切换都是隐藏的
     var isLocked by remember { mutableStateOf(false) }
+    var showPlayerStats by remember { mutableStateOf(false) }
+    val playerStats by rememberPlayerStatsState(playerState)
     val sheetsController = rememberVideoSideSheetsController<EpisodeVideoSideSheetPage>()
     val anySideSheetVisible by sheetsController.hasPageAsState()
     val previewModeText = stringResource(Lang.subject_episode_preview_mode)
@@ -242,6 +249,8 @@ internal fun EpisodeVideoImpl(
                                 playerControllerState = playerControllerState,
                                 sidebarVisible = sidebarVisible,
                                 onToggleSidebar = onToggleSidebar,
+                                playerStatsVisible = showPlayerStats,
+                                onTogglePlayerStats = { showPlayerStats = !showPlayerStats },
                             )
                         },
                         // VideoScaffold already applies top/horizontal insets around the top bar.
@@ -320,10 +329,18 @@ internal fun EpisodeVideoImpl(
                     onToggleFullscreen = onClickFullScreen,
                     onExitFullscreen = onExitFullscreen,
                     onToggleDanmaku = onToggleDanmaku,
+                    onTogglePlayerStats = {
+                        showPlayerStats = !showPlayerStats
+                    },
                     family = gestureFamily,
                     indicatorState,
                     fastForwardSpeed = fastForwardSpeed,
                 )
+            },
+            playerStatsOverlay = {
+                if (showPlayerStats) {
+                    PlayerStatsOverlay(playerStats)
+                }
             },
             floatingMessage = {
                 Column {
@@ -484,6 +501,8 @@ private fun EpisodeVideoTopBarActions(
     playerControllerState: PlayerControllerState,
     sidebarVisible: Boolean,
     onToggleSidebar: (isCollapsed: Boolean) -> Unit,
+    playerStatsVisible: Boolean,
+    onTogglePlayerStats: () -> Unit,
 ) {
     var showShareDropdown by rememberSaveable { mutableStateOf(false) }
     var showMoreDropdown by rememberSaveable { mutableStateOf(false) }
@@ -495,6 +514,8 @@ private fun EpisodeVideoTopBarActions(
     val moreOptionsText = stringResource(Lang.subject_episode_more_options)
     val externalLinksText = stringResource(Lang.subject_episode_external_links)
     val cacheText = stringResource(Lang.subject_episode_cache)
+    val showPlayerStatsText = stringResource(Lang.video_player_stats_title_show)
+    val hidePlayerStatsText = stringResource(Lang.video_player_stats_title_hide)
     val collapseSidebarText = stringResource(Lang.subject_episode_collapse_sidebar)
     val expandSidebarText = stringResource(Lang.subject_episode_expand_sidebar)
 
@@ -539,6 +560,14 @@ private fun EpisodeVideoTopBarActions(
             expanded = showMoreDropdown,
             onDismissRequest = { showMoreDropdown = false },
         ) {
+            DropdownMenuItem(
+                text = { Text(if (playerStatsVisible) hidePlayerStatsText else showPlayerStatsText) },
+                onClick = {
+                    showMoreDropdown = false
+                    onTogglePlayerStats()
+                },
+                leadingIcon = { Icon(Icons.Outlined.Analytics, null) },
+            )
             DropdownMenuItem(
                 text = { Text(externalLinksText) },
                 onClick = {
