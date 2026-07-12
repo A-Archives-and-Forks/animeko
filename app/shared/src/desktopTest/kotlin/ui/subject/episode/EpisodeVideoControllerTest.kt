@@ -418,6 +418,66 @@ class EpisodeVideoControllerTest {
         }
     }
 
+    /**
+     * @see GestureFamily.swipeMidForFullscreen
+     */
+    @Test
+    fun `touch - swipeMidForFullscreen - swipe up enters and swipe down exits`() = runAniComposeUiTest {
+        val platformWindow = placementBackedPlatformWindow()
+        var fullscreenCount = 0
+        var exitFullscreenCount = 0
+        setContent {
+            Player(
+                GestureFamily.TOUCH,
+                onClickFullScreen = { fullscreenCount++ },
+                onExitFullscreen = { exitFullscreenCount++ },
+                platformWindowOverride = platformWindow,
+            )
+        }
+        waitForIdle()
+
+        // 未在全屏时, 在中间区域向上滑动: 进入全屏
+        videoGestureHost.performTouchInput {
+            swipe(start = Offset(centerX, centerY + 200f), end = Offset(centerX, centerY - 200f))
+        }
+        runOnIdle {
+            assertEquals(1, fullscreenCount)
+            assertEquals(0, exitFullscreenCount)
+        }
+
+        // 未在全屏时向下滑动: 无效果
+        videoGestureHost.performTouchInput {
+            swipe(start = Offset(centerX, centerY - 200f), end = Offset(centerX, centerY + 200f))
+        }
+        runOnIdle {
+            assertEquals(1, fullscreenCount)
+            assertEquals(0, exitFullscreenCount)
+        }
+
+        runOnIdle {
+            platformWindow.windowState.placement = WindowPlacement.Fullscreen
+        }
+        waitForIdle()
+
+        // 全屏时向下滑动: 退出全屏
+        videoGestureHost.performTouchInput {
+            swipe(start = Offset(centerX, centerY - 200f), end = Offset(centerX, centerY + 200f))
+        }
+        runOnIdle {
+            assertEquals(1, fullscreenCount)
+            assertEquals(1, exitFullscreenCount)
+        }
+
+        // 全屏时向上滑动: 无效果
+        videoGestureHost.performTouchInput {
+            swipe(start = Offset(centerX, centerY + 200f), end = Offset(centerX, centerY - 200f))
+        }
+        runOnIdle {
+            assertEquals(1, fullscreenCount)
+            assertEquals(1, exitFullscreenCount)
+        }
+    }
+
     @Test
     fun `touch - keyboard shortcuts - playback fullscreen danmaku seek volume and speed`() = runAniComposeUiTest {
         lateinit var playerState: TestMediampPlayer

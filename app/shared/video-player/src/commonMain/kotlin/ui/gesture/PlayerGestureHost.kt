@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025 OpenAni and contributors.
+ * Copyright (C) 2024-2026 OpenAni and contributors.
  *
  * 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
  * Use of this source code is governed by the GNU AGPLv3 license, which can be found at the following link.
@@ -83,7 +83,6 @@ import me.him188.ani.app.utils.fixToString
 import me.him188.ani.app.videoplayer.ui.ControllerVisibility
 import me.him188.ani.app.videoplayer.ui.PlaybackSpeedControllerState
 import me.him188.ani.app.videoplayer.ui.PlayerControllerState
-import me.him188.ani.app.videoplayer.ui.playerFocusHost
 import me.him188.ani.app.videoplayer.ui.gesture.GestureIndicatorState.State.BRIGHTNESS
 import me.him188.ani.app.videoplayer.ui.gesture.GestureIndicatorState.State.FAST_BACKWARD
 import me.him188.ani.app.videoplayer.ui.gesture.GestureIndicatorState.State.FAST_FORWARD
@@ -92,6 +91,7 @@ import me.him188.ani.app.videoplayer.ui.gesture.GestureIndicatorState.State.RESU
 import me.him188.ani.app.videoplayer.ui.gesture.GestureIndicatorState.State.SEEKING
 import me.him188.ani.app.videoplayer.ui.gesture.GestureIndicatorState.State.VOLUME
 import me.him188.ani.app.videoplayer.ui.gesture.SwipeSeekerState.Companion.swipeToSeek
+import me.him188.ani.app.videoplayer.ui.playerFocusHost
 import me.him188.ani.app.videoplayer.ui.progress.PlayerProgressSliderState
 import me.him188.ani.app.videoplayer.ui.rememberAlwaysOnRequester
 import me.him188.ani.utils.platform.Platform
@@ -372,6 +372,7 @@ enum class GestureFamily(
     val swipeToSeek: Boolean,
     val swipeRhsForVolume: Boolean,
     val swipeLhsForBrightness: Boolean,
+    val swipeMidForFullscreen: Boolean,
     val longPressForFastSkip: Boolean,
     val scrollForVolume: Boolean,
     val autoHideController: Boolean,
@@ -386,6 +387,7 @@ enum class GestureFamily(
         swipeToSeek = true,
         swipeRhsForVolume = true,
         swipeLhsForBrightness = true,
+        swipeMidForFullscreen = true,
         longPressForFastSkip = true,
         volumeControllerOnBottomBar = false,
         scrollForVolume = false,
@@ -400,6 +402,7 @@ enum class GestureFamily(
         swipeToSeek = false,
         swipeRhsForVolume = false,
         swipeLhsForBrightness = false,
+        swipeMidForFullscreen = false,
         longPressForFastSkip = false,
         scrollForVolume = true,
         autoHideController = false,
@@ -626,6 +629,7 @@ fun PlayerGestureHost(
                     .ifThen(
                         family.swipeLhsForBrightness ||
                                 family.swipeRhsForVolume ||
+                                family.swipeMidForFullscreen ||
                                 family.longPressForFastSkip,
                     ) {
                         systemGesturesPadding()
@@ -655,7 +659,22 @@ fun PlayerGestureHost(
                         .fillMaxHeight(),
                 )
 
-                Box(Modifier.weight(1f).fillMaxHeight())
+                Box(
+                    Modifier
+                        .ifThen(family.swipeMidForFullscreen) {
+                            swipeToFullscreen(
+                                enabled = !seekerState.isSeeking && !adjustingVolumeOrBrightness && !adjustingForwardOrBackward,
+                                onEnterFullscreen = {
+                                    if (!systemFullscreen) onToggleFullscreen()
+                                },
+                                onExitFullscreen = {
+                                    if (systemFullscreen) onExitFullscreen()
+                                },
+                            )
+                        }
+                        .weight(1f)
+                        .fillMaxHeight(),
+                )
 
                 Box(
                     Modifier
