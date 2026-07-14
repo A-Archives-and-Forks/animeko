@@ -73,6 +73,8 @@ import me.him188.ani.app.ui.lang.settings_player_auto_switch_media_on_error
 import me.him188.ani.app.ui.lang.settings_player_experimental_hls_segment_filter
 import me.him188.ani.app.ui.lang.settings_player_experimental_hls_segment_filter_description
 import me.him188.ani.app.ui.lang.settings_player_enable_regex_filter
+import me.him188.ani.app.ui.lang.settings_player_frame_preview
+import me.him188.ani.app.ui.lang.settings_player_frame_preview_description
 import me.him188.ani.app.ui.lang.settings_player_fullscreen_always_show
 import me.him188.ani.app.ui.lang.settings_player_fullscreen_auto_hide
 import me.him188.ani.app.ui.lang.settings_player_fullscreen_button
@@ -519,6 +521,15 @@ fun SettingsScope.PlayerGroup(
             )
             HorizontalDividerItem()
         }
+        HorizontalDividerItem()
+        SwitchItem(
+            checked = config.enableFramePreview,
+            onCheckedChange = {
+                videoScaffoldConfig.update(config.copy(enableFramePreview = it))
+            },
+            title = { Text(stringResource(Lang.settings_player_frame_preview)) },
+            description = { Text(stringResource(Lang.settings_player_frame_preview_description)) },
+        )
         DropdownItem(
             selected = { config.fastForwardSpeed },
             values = { listOf(1.5f, 2f, 2.5f, 3f) },

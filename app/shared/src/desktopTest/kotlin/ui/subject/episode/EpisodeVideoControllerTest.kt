@@ -20,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -86,11 +87,14 @@ import me.him188.ani.app.videoplayer.ui.gesture.LevelController
 import me.him188.ani.app.videoplayer.ui.gesture.NoOpLevelController
 import me.him188.ani.app.videoplayer.ui.gesture.VIDEO_GESTURE_MOUSE_MOVE_SHOW_CONTROLLER_DURATION
 import me.him188.ani.app.videoplayer.ui.gesture.VIDEO_GESTURE_TOUCH_SHOW_CONTROLLER_DURATION
+import me.him188.ani.app.videoplayer.ui.progress.MediaProgressFramePreviewState
 import me.him188.ani.app.videoplayer.ui.progress.PlayerControllerDefaults
 import me.him188.ani.app.videoplayer.ui.progress.PlayerProgressSliderState
 import me.him188.ani.app.videoplayer.ui.progress.TAG_DANMAKU_ICON_BUTTON
 import me.him188.ani.app.videoplayer.ui.progress.TAG_MEDIA_PROGRESS_INDICATOR_TEXT
 import me.him188.ani.app.videoplayer.ui.progress.TAG_PROGRESS_SLIDER
+import me.him188.ani.app.videoplayer.ui.progress.TAG_PROGRESS_SLIDER_CENTERED_PREVIEW_FRAME
+import me.him188.ani.app.videoplayer.ui.progress.TAG_PROGRESS_SLIDER_PREVIEW_FRAME
 import me.him188.ani.app.videoplayer.ui.progress.TAG_PROGRESS_SLIDER_PREVIEW_POPUP
 import me.him188.ani.app.videoplayer.ui.progress.TAG_SELECT_EPISODE_ICON_BUTTON
 import me.him188.ani.app.videoplayer.ui.progress.TAG_SPEED_SWITCHER_DROPDOWN_MENU
@@ -199,6 +203,9 @@ class EpisodeVideoControllerTest {
         platformWindowOverride: PlatformWindow? = null,
         showDanmakuEditor: () -> Boolean = { true },
         onEditorEscape: (() -> Unit)? = null,
+        expanded: Boolean = true,
+        framePreview: MediaProgressFramePreviewState? = null,
+        cacheChunkState: ChunkState = ChunkState.NONE,
     ) {
         ProvideCompositionLocalsForPreview(darkMode = DarkMode.DARK) {
             val platformWindow = platformWindowOverride ?: LocalPlatformWindow.current
@@ -208,8 +215,7 @@ class EpisodeVideoControllerTest {
                 val playerState = remember {
                     TestMediampPlayer(scope.coroutineContext).also(onPlayerStateCreated)
                 }
-                val expanded = true
-                val cacheProgressInfoFlow = staticMediaCacheProgressState(ChunkState.NONE).flow
+                val cacheProgressInfoFlow = staticMediaCacheProgressState(cacheChunkState).flow
                 EpisodeVideoImpl(
                 playerState = playerState,
                 expanded = expanded,
@@ -246,12 +252,15 @@ class EpisodeVideoControllerTest {
                         cacheProgressInfoFlow = cacheProgressInfoFlow,
                         Modifier.testTag(TAG_DETACHED_PROGRESS_SLIDER),
                         enabled = false,
+                        framePreview = framePreview,
+                        showFramePreviewInPopup = expanded,
                     )
                 },
                 sidebarVisible = true,
                 onToggleSidebar = {},
                 progressSliderState = progressSliderState,
                 cacheProgressInfoFlow = cacheProgressInfoFlow,
+                framePreview = framePreview,
                 audioController = audioController,
                 brightnessController = NoOpLevelController,
                 playbackSpeedControllerState = playbackSpeedControllerState ?: remember {
@@ -1187,6 +1196,41 @@ class EpisodeVideoControllerTest {
             detachedProgressSlider.assertDoesNotExist()
             assertEquals(NORMAL_VISIBLE, controllerState.visibility)
         }
+    }
+
+    @Test
+    fun `compact frame preview shows centered image and time-only popup`() = runAniComposeUiTest {
+        val visibleControllerState = PlayerControllerState(NORMAL_VISIBLE)
+        val framePreview = MediaProgressFramePreviewState(
+            fetchFrame = { ImageBitmap(width = 160, height = 90) },
+            debounceMillis = 0,
+        )
+        setContent {
+            Player(
+                gestureFamily = GestureFamily.MOUSE,
+                playerControllerState = visibleControllerState,
+                expanded = false,
+                framePreview = framePreview,
+                cacheChunkState = ChunkState.DONE,
+            )
+        }
+        waitForIdle()
+
+        runOnUiThread {
+            progressSlider.performMouseInput { moveTo(center) }
+        }
+        waitUntil(timeoutMillis = WAIT_TIMEOUT) {
+            previewPopup.exists() &&
+                onNodeWithTag(TAG_PROGRESS_SLIDER_CENTERED_PREVIEW_FRAME, useUnmergedTree = true).exists()
+        }
+
+        onNodeWithTag(TAG_PROGRESS_SLIDER_PREVIEW_FRAME, useUnmergedTree = true).assertDoesNotExist()
+        val playerCenter = player.fetchSemanticsNode().boundsInRoot.center
+        val frameCenter = onNodeWithTag(
+            TAG_PROGRESS_SLIDER_CENTERED_PREVIEW_FRAME,
+            useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot.center
+        assertEquals(playerCenter, frameCenter)
     }
 
     @Test

@@ -615,6 +615,7 @@ object PlayerControllerDefaults {
         enabled: Boolean = true,
         showPreviewTimeTextOnThumb: Boolean = true,
         framePreview: MediaProgressFramePreviewState? = null,
+        showFramePreviewInPopup: Boolean = true,
     ) {
         val cacheProgressInfo by cacheProgressInfoFlow.collectAsStateWithLifecycle(null)
         MediaProgressSlider(
@@ -622,6 +623,7 @@ object PlayerControllerDefaults {
             enabled = enabled,
             showPreviewTimeTextOnThumb = showPreviewTimeTextOnThumb,
             framePreview = framePreview,
+            showFramePreviewInPopup = showFramePreviewInPopup,
             modifier = modifier,
         )
     }

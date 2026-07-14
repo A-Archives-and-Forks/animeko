@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.outlined.Analytics
@@ -122,14 +123,16 @@ import me.him188.ani.app.videoplayer.ui.gesture.rememberGestureIndicatorState
 import me.him188.ani.app.videoplayer.ui.gesture.rememberSwipeSeekerState
 import me.him188.ani.app.videoplayer.ui.hasPageAsState
 import me.him188.ani.app.videoplayer.ui.progress.AudioSwitcher
+import me.him188.ani.app.videoplayer.ui.progress.MediaProgressFramePreviewState
 import me.him188.ani.app.videoplayer.ui.progress.MediaProgressIndicatorText
+import me.him188.ani.app.videoplayer.ui.progress.MediaProgressSliderDefaults
 import me.him188.ani.app.videoplayer.ui.progress.PlayerControllerBar
 import me.him188.ani.app.videoplayer.ui.progress.PlayerControllerDefaults
 import me.him188.ani.app.videoplayer.ui.progress.PlayerControllerDefaults.SpeedSwitcher
 import me.him188.ani.app.videoplayer.ui.progress.PlayerControllerDefaults.VideoAspectRatioSelector
 import me.him188.ani.app.videoplayer.ui.progress.PlayerProgressSliderState
+import me.him188.ani.app.videoplayer.ui.progress.ProgressSliderCenteredPreviewFrame
 import me.him188.ani.app.videoplayer.ui.progress.SubtitleSwitcher
-import me.him188.ani.app.videoplayer.ui.progress.rememberMediaProgressFramePreviewState
 import me.him188.ani.app.videoplayer.ui.progress.rememberMediaProgressSliderState
 import me.him188.ani.app.videoplayer.ui.rememberAlwaysOnRequester
 import me.him188.ani.app.videoplayer.ui.rememberPlayerStatsState
@@ -184,6 +187,7 @@ internal fun EpisodeVideoImpl(
     onToggleSidebar: (isCollapsed: Boolean) -> Unit,
     progressSliderState: PlayerProgressSliderState,
     cacheProgressInfoFlow: Flow<MediaCacheProgressInfo>,
+    framePreview: MediaProgressFramePreviewState? = null,
     audioController: LevelController,
     brightnessController: LevelController,
     playbackSpeedControllerState: PlaybackSpeedControllerState?,
@@ -220,6 +224,7 @@ internal fun EpisodeVideoImpl(
     }
 
     AniTheme(darkModeOverride = DarkMode.DARK) {
+        val progressSliderColors = MediaProgressSliderDefaults.colors()
         VideoScaffold(
             expanded = expanded,
             modifier = modifier
@@ -371,6 +376,14 @@ internal fun EpisodeVideoImpl(
                     }
                 }
             },
+            framePreviewOverlay = {
+                if (!expanded) {
+                    ProgressSliderCenteredPreviewFrame(
+                        frame = framePreview?.frame,
+                        borderColor = progressSliderColors.previewTimeBackgroundColor,
+                    )
+                }
+            },
             rhsButtons = {
                 if (expanded && LocalPlatform.current.isDesktop()) {
                     ScreenshotButton(
@@ -430,7 +443,8 @@ internal fun EpisodeVideoImpl(
                             progressSliderState,
                             cacheProgressInfoFlow = cacheProgressInfoFlow,
                             showPreviewTimeTextOnThumb = expanded,
-                            framePreview = rememberMediaProgressFramePreviewState(playerState),
+                            framePreview = framePreview,
+                            showFramePreviewInPopup = expanded,
                         )
                     },
                     danmakuEditor = danmakuEditor,
@@ -714,7 +728,10 @@ private fun PreviewVideoScaffoldImpl(
             VideoAspectRatioControllerState(NoOpVideoAspectRatio, scope)
         },
         leftBottomTips = {
-            PlayerControllerDefaults.LeftBottomTips(onClick = {})
+            PlayerControllerDefaults.LeftBottomTips(
+                onClick = {},
+                modifier = Modifier.padding(if (expanded) 16.dp else 8.dp)
+            )
         },
         fullscreenSwitchButton = {
             EpisodeVideoDefaults.FloatingFullscreenSwitchButton(
