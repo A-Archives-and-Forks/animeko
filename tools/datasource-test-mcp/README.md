@@ -124,13 +124,16 @@ Point your MCP client at the running server, e.g. in `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "animeko-datasource-test": {
+    "ani-datasource-test": {
       "type": "http",
       "url": "http://127.0.0.1:8264/mcp"
     }
   }
 }
 ```
+
+The `.agents/skills/datasource-test` skill looks for this MCP under the name `ani-datasource-test`
+(tools like `mcp__ani-datasource-test__selector_resolve_episode`); keep the name in sync if you change it.
 
 ## Test
 

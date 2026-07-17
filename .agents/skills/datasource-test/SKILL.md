@@ -1,6 +1,6 @@
 ---
 name: datasource-test
-description: Test and debug an Animeko media source from its JSON config using the datasource-test-mcp HTTP MCP server. Validates selector config syntax offline, runs the real SelectorMediaSourceEngine pipeline (searchSubjects → selectSubjects → searchEpisodes → selectEpisodes → selectMedia) with per-step traces, iterates CSS selectors offline against saved HTML, tests matchVideo regexes, extracts real video URLs via CEF WebView, and probes actual playback with VLC. Use when asked to 测试数据源 / 调试 selector 配置 / verify a datasource JSON works / diagnose why a source finds no candidates for an episode or fails to play. Covers web-selector (CSS selector) sources in depth; other factories (rss/dmhy/mikan/jellyfin/...) via end-to-end testing. Also defines the capability-evolution (进化) loop: when a site is provably beyond current engine/WebVideoExtractor capabilities, write a capability-gap document and hand it to an isolated subagent that implements the new capability and outputs a git patch, then re-verify. Requires starting the MCP server from this repo (instructions inside).
+description: Test and debug an Animeko media source from its JSON config using the datasource-test-mcp HTTP MCP server. Validates selector config syntax offline, runs the real SelectorMediaSourceEngine pipeline (searchSubjects → selectSubjects → searchEpisodes → selectEpisodes → selectMedia) with per-step traces, iterates CSS selectors offline against saved HTML, tests matchVideo regexes, extracts real video URLs via CEF WebView, and probes actual playback with VLC. Use when asked to 测试数据源 / 调试 selector 配置 / verify a datasource JSON works / diagnose why a source finds no candidates for an episode or fails to play. Covers web-selector (CSS selector) sources in depth; other factories (rss/dmhy/mikan/jellyfin/...) via end-to-end testing. Also defines the capability-evolution (进化) loop: when a site is provably beyond current engine/WebVideoExtractor capabilities, write a capability-gap document and hand it to an isolated subagent that implements the new capability and outputs a git patch, then re-verify. Works exclusively through the `ani-datasource-test` HTTP MCP; it never starts the server itself — if that MCP is not configured the skill stops and tells the user how to add it. When a `chrome-devtools` MCP is also available, it is used as the real-browser ground truth (rendered DOM, real network requests, click interactions) to distinguish config mistakes from genuine engine/extractor capability gaps.
 ---
 
 # 用 JSON 配置测试 Animeko 数据源
@@ -18,51 +18,88 @@ description: Test and debug an Animeko media source from its JSON config using t
 selector 引擎或 WebVideoExtractor 等组件的现有能力。此时不要硬调配置,走第 9 节的
 「能力进化」流程: 取证 → 写缺口文档 → 交给隔离 subagent 实现新能力(输出 git patch) → 复测。
 
-所有测试通过 `tools/datasource-test-mcp` 的 HTTP MCP server 完成。它直接调用 App 的
-`SelectorMediaSourceEngine` 真实代码,行为与 App 一致。两份参考文档:
+所有测试通过 `ani-datasource-test` MCP(由 `tools/datasource-test-mcp` 提供的 HTTP MCP server)完成。
+它直接调用 App 的 `SelectorMediaSourceEngine` 真实代码,行为与 App 一致。两份参考文档:
 
 - `tools/datasource-test-mcp/README.md` — server 能力总览、多线路语义、运行方式;
 - MCP 工具 `get_selector_engine_docs` — 每个引擎步骤的输入/输出/常见问题/最小配置示例
   (源文件 `tools/datasource-test-mcp/src/main/resources/selector-engine-docs.md`)。
   **开始调试 selector 源前先调用一次它**,里面的步骤语义本 skill 不再重复。
 
-## 0. 启动并连接 MCP server
+## 0. 前置: 确认 ani-datasource-test MCP 可用(用不了就停止)
 
-先探测是否已在运行(默认 `http://127.0.0.1:8264/mcp`):
+本 skill **只通过**一个名为 **`ani-datasource-test`** 的 HTTP MCP server 工作,其工具形如
+`mcp__ani-datasource-test__validate_selector_config`、`mcp__ani-datasource-test__selector_resolve_episode` 等。
 
-```bash
-curl -s http://127.0.0.1:8264/mcp -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
-# 返回 {"jsonrpc":"2.0","id":1,"result":{}} 即在运行
-```
+**开始任何测试前先确认该 MCP 已就绪**: 在当前可用工具里查找 `mcp__ani-datasource-test__*`
+(如 `validate_selector_config`);无法确认时,试调用一次
+`mcp__ani-datasource-test__validate_selector_config`,返回「未知工具 / 未连接 / 连接错误」即视为不可用。
 
-没在运行则构建并后台启动:
+- **可用** → 用这些 MCP 工具完成后续全部步骤;
+- **不可用** → **立即停止本 skill**。**不要**自己 `installDist` 或后台启动 server,
+  **不要**用 curl 直连 HTTP 端口绕过。向用户输出下面的「添加方法」,请他们配置好
+  `ani-datasource-test` MCP 后**重新发起**测试。
+
+### 添加方法(agent 只输出这段指引,不代为执行)
+
+第一步——用户在 animeko 仓库根目录启动 HTTP server,并保持它运行:
 
 ```bash
 ./gradlew :tools:datasource-test-mcp:installDist
-# unix / macOS:
-tools/datasource-test-mcp/launcher &
-# Windows (后台):
-tools\datasource-test-mcp\build\install\datasource-test-mcp\bin\datasource-test-mcp.bat
+tools/datasource-test-mcp/launcher                                              # unix / macOS
+tools\datasource-test-mcp\build\install\datasource-test-mcp\bin\datasource-test-mcp.bat   # Windows
 ```
 
-调用工具的两种方式:
+默认监听 `http://127.0.0.1:8264/mcp`(可加 `--host` / `--port` 覆盖)。
 
-1. **MCP client 已配置**(工具名形如 `mcp__animeko-datasource-test__validate_selector_config`)——直接调用;
-2. **直连 HTTP**(无需任何配置): server 是无状态 JSON-RPC,不需要 `initialize`,直接 POST `tools/call`:
+第二步——在 agent 客户端里把它注册为名为 `ani-datasource-test` 的 HTTP MCP:
 
-```bash
-curl -s http://127.0.0.1:8264/mcp -H 'Content-Type: application/json' -d '{
-  "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-  "params": {"name": "validate_selector_config", "arguments": {"config": { ...配置JSON原样内嵌... }}}
-}'
-```
+- **Claude Code**:
+  ```bash
+  claude mcp add --transport http ani-datasource-test http://127.0.0.1:8264/mcp
+  ```
+  或写入项目根的 `.mcp.json`:
+  ```json
+  { "mcpServers": { "ani-datasource-test": { "type": "http", "url": "http://127.0.0.1:8264/mcp" } } }
+  ```
+- **Codex**: 在 `~/.codex/config.toml` 增加(以所用 Codex 版本的文档为准):
+  ```toml
+  [mcp_servers.ani-datasource-test]
+  url = "http://127.0.0.1:8264/mcp"
+  ```
 
-- 工具返回在 `result.content[0].text` 里,是一个 **JSON 字符串**,解析它得到结构化结果;
-  `result.isError=true` 表示工具执行异常。
-- `tools/list` 可枚举全部工具与参数 schema。
-- server **串行**执行工具调用,不要并发多个请求。
-- 长参数(整页 HTML)建议写入临时文件后用脚本拼 JSON-RPC body,避免 shell 转义问题。
+配置后重启 / 重新连接客户端使 `mcp__ani-datasource-test__*` 工具生效,再重新发起测试。
+
+### 调用这些 MCP 工具时
+
+- 工具返回的是一段 **JSON 文本**,解析它得到结构化数据;结果被标记为 error 时表示工具执行异常。
+- server **串行**处理调用,不要并发多个工具请求。
+- 整页 HTML 很大: 优先用 `url` 让工具自行抓取,只在离线迭代必须传 `html` 时才内联,并留意上下文占用。
+
+### 可选但强烈推荐: chrome-devtools MCP(浏览器真相源)
+
+如果当前**还**能用一个 **chrome-devtools MCP**(工具形如 `mcp__chrome-devtools__*`,如
+`navigate_page` / `take_snapshot` / `list_network_requests` / `get_network_request` / `click` /
+`evaluate_script` / `list_console_messages`;具体名称以所连接的 server 为准),把它与
+`ani-datasource-test` **结合使用**。它不是必需的——没有也能跑本 skill,只是遇到"工具解析结果与
+站点实际不符"时少了直接对照手段。**没有就别自己启动浏览器**,按现有证据推进或转第 9 节取证。
+
+**为什么有用**: `ani-datasource-test` 引擎是**无 JS 的静态 HTTP 抓取 + 解析**,chrome-devtools
+驱动的是**真实浏览器**(执行 JS、能交互)。当某一步在 MCP 工具里跑不通、站点在浏览器里却正常时,
+浏览器看到的才是"真相",**两者的差异本身就是诊断信号**。
+
+**怎么用**(按需, 不是每步都跑;详细触发点见第 4、6、9 节):
+
+- 某解析步骤跑不通 → `navigate_page` 打开对应页面(搜索页代入真实关键词 / 条目详情页 / playUrl)→
+  `take_snapshot` 看**渲染后** DOM,与 MCP 工具返回的静态 HTML 对比;`list_network_requests`
+  看真实请求(搜索是否 POST/带 token、是否有返回数据的 JSON 接口、有没有 m3u8/mp4 媒体请求)。
+- 判定「配置能修好」还是「引擎能力缺口」: 浏览器 DOM 与工具 HTML 结构一致 → 只是 selector 没写对;
+  浏览器有数据而工具 HTML 没有 → 页面靠 JS 渲染(找到底层 JSON 接口可改用 `json-path-indexed`,
+  否则是缺口);媒体请求要 `click` 播放器后才出现 → click-gate,WebVideoExtractor 缺口。
+
+**关键纪律**: chrome-devtools 只用来**取真相、定位问题**。selector/正则的修正最终必须回到
+`ani-datasource-test` 的离线步骤、用**工具实际抓到的静态 HTML**(而非浏览器渲染后的 DOM)验证通过——
+因为 App 里跑的就是那个无 JS 引擎。**别把只在浏览器渲染后才成立的 selector 当作修好了**。
 
 ## 1. 识别配置类型
 
@@ -117,14 +154,19 @@ selector_resolve_episode(subjectId, episodeId, config, extractVideo=false)
 | 最先失败的步骤 | 常见症状 (看 summary/details) | 下一步动作 |
 |---|---|---|
 | `aniMetadata` | Ani API 拿不到条目/剧集 | 检查 subjectId/episodeId 是否为有效整数;网络问题则重试一次 |
-| `searchSubjects` | 404 | `searchUrl` 模板错误或站点换了搜索路径;先 `curl` 人工确认站点当前的搜索 URL 形态 |
+| `searchSubjects` | 404 | `searchUrl` 模板错误或站点换了搜索路径;有 chrome-devtools 时 `navigate_page`+`list_network_requests` 看站点真实搜索请求的 URL/method,否则 `curl` 人工确认 |
 | `searchSubjects` | `captchaKind` 非空 | **停**。本工具无法过验证码,报告用户改用 App 内设置页的数据源测试器 |
-| `selectSubjects` | 解析出 0 个条目 | 转第 5 步: 拿搜索页 HTML 离线迭代 subjectFormat 的 selector;若 HTML 其实是 JSON,改用 `json-path-indexed` 格式 |
+| `selectSubjects` | 解析出 0 个条目 | 转第 5 步: 拿搜索页 HTML 离线迭代 subjectFormat 的 selector;若 HTML 其实是 JSON,改用 `json-path-indexed`。有 chrome-devtools 时先 `take_snapshot` 对比:浏览器有条目而工具 HTML 没有 → JS 渲染,查 JSON 接口或转第 9 节 |
 | `searchEpisodes` | 条目详情页 404 | 条目链接拼接错误,检查 `rawBaseUrl`(留空时从 searchUrl 推断,details 里能看到实际 URL) |
-| `selectEpisodes` | 0 个剧集 / 0 条线路 | 转第 5 步: 拿详情页 HTML 离线迭代 channelFormat 的 selector |
+| `selectEpisodes` | 0 个剧集 / 0 条线路 | 转第 5 步: 拿详情页 HTML 离线迭代 channelFormat 的 selector;同上,可用 chrome-devtools 的渲染后 DOM 判断是 selector 问题还是 JS 渲染 |
 | `selectEpisodes` | 剧集有了但 `episodeSort` 全空 | `matchEpisodeSortFromName` 正则没匹配上剧集名(需要 `(?<ep>)` 分组);对照 details 里的剧集名调正则 |
 | `selectMedia` | `filteredCount=0` 但 original 非空 | 看 details 里的 `filteredOut`: 集数对不上(sort vs ep、电影/OVA 特判)或该条目根本不含目标集。也可临时把 config 的 `filterByEpisodeSort` 设 false 验证是过滤问题还是解析问题 |
 | 全部成功但 `medias` 为空 | 目标条目排名靠后被截断 | 调大 `maxSubjectsPerName`(默认 3,App 内无此限制;条目按名称长度升序排) |
+
+> `selectSubjects`/`selectEpisodes` 解析不出来时,「配置没写对」和「页面靠 JS 渲染(引擎能力缺口)」
+> 表现相同(都是 0 条)。有 chrome-devtools MCP 就用它一步分辨: `navigate_page` 后 `take_snapshot`
+> 的渲染 DOM 若与工具返回的静态 HTML 结构一致,就是 selector 问题(转第 5 步);若渲染后才有数据,
+> 就是 JS 渲染。**但修好的 selector 必须在工具的静态 HTML 上验证通过**(见第 0 节纪律)。
 
 ## 5. 单步调试与离线迭代
 
@@ -152,8 +194,9 @@ selector_resolve_episode(subjectId, episodeId, config, extractVideo=false)
 
 解析层通过后:
 
-1. **先离线调正则**: 从 `medias[0].playUrl` 猜/从站点播放页的网络请求里挑几个 URL,
-   `matchWebVideo(config, url)` 确认判定(`matched` / `loadPage` / `continue`)。
+1. **先离线调正则**: 拿几个候选视频 URL —— 有 chrome-devtools 时 `navigate_page` 打开 playUrl、
+   `list_network_requests` 过滤 m3u8/mp4/媒体请求拿到**真实** URL 与请求头(最可靠);否则从
+   playUrl 结构猜。用 `matchWebVideo(config, url)` 确认判定(`matched` / `loadPage` / `continue`)。
    注意嵌套页判定优先于视频判定,`matchNestedUrl` 写太宽会把视频 URL 当页面加载导致永远超时;
 2. **真实解析**: `selector_run_step(step=extractVideo, url=playUrl, config, probeResolvedVideo=true)`,
    或直接 `selector_resolve_episode(..., extractVideo=true, probeVideo=true)`(默认值)跑完整链路。
@@ -164,8 +207,11 @@ selector_resolve_episode(subjectId, episodeId, config, extractVideo=false)
 
 WebView 拦不到视频 URL 时: 看 extractVideo 返回的 `diagnostics`(拦截到的请求样本),
 从中找出真实视频 URL 的模式,回去改 `matchVideoUrl` / `matchNestedUrl`,先用 `matchWebVideo` 离线验证再重跑。
-若 `diagnostics` 显示页面已正常加载却**完全没有媒体类请求**,用浏览器工具人工打开播放页对照——
-如果需要点击播放器等交互后视频请求才出现,这不是配置问题,是 WebVideoExtractor 的能力缺口,转第 9 节。
+若 `diagnostics` 显示页面已正常加载却**完全没有媒体类请求**,用 chrome-devtools 复现对照:
+`navigate_page` 打开 playUrl → `list_network_requests` 看有无媒体请求 → 若没有,`click` 播放器按钮后
+再 `list_network_requests`;若点击后才出现视频请求(而 App 的 WebViewExtractor 不会点击),
+这不是配置问题,是 WebVideoExtractor 的能力缺口,把这段 devtools 证据带上转第 9 节。
+(没有 chrome-devtools 时,凭 `diagnostics` 无媒体请求这一点也可推断,但证据较弱。)
 
 ## 7. App 级复核与非 selector 源
 
@@ -212,19 +258,21 @@ test_subject_episode_source(subjectId, episodeId,
 
 1. `validate_selector_config` 无 error;
 2. 已按第 4–6 步离线迭代过(证明是 selector/正则**表达不了**,而不是没写对);
-3. 拿到指向**机制性缺失**的证据(下表),必要时用你可用的浏览器工具人工访问站点复现对照。
+3. 拿到指向**机制性缺失**的证据(下表)。**有 chrome-devtools MCP 时,缺口判定几乎都靠它坐实**——
+   它执行 JS、能看真实网络、能交互,正是区分"配置问题"与"引擎机制不支持"的手段;下表「如何确证」
+   多数就是它的用法。没有它时可凭工具输出推断,但证据较弱,报告里要标注为"推断"。
 
 典型缺口与确证方法(非穷尽,遇到新形态照同样思路取证):
 
-| 组件 | 缺口示例 | 如何确证 |
+| 组件 | 缺口示例 | 如何确证(chrome-devtools MCP) |
 |---|---|---|
-| 引擎·搜索 | 搜索要用 POST / 需要动态 token / 需要登录态 | fetch 搜索 URL 拿到的不是结果页;浏览器 devtools 观察真实搜索请求的方法与参数 |
-| 引擎·解析 | 条目/剧集列表由 JS 动态渲染,静态 HTML 无数据 | `searchSubjects`/`searchEpisodes` 返回的 HTML 里搜不到浏览器中肉眼可见的条目文本(引擎是无 JS 的 HTTP+静态解析) |
-| 引擎·解析 | 搜索结果/剧集列表分页,目标在后面几页 | 首页 HTML 只含前 N 项加分页控件;引擎只取单页 |
-| 引擎·selectMedia | playUrl 需要由 JS/接口计算,`<a>` 里没有 | HTML 里的 href 是 `javascript:...` 或占位符 |
-| WebVideoExtractor | **需要用户手势(点一下播放器)才触发视频加载** | `extractVideo` 的 `diagnostics` 显示页面加载完成但没有任何媒体类请求;人工浏览器打开播放页,点击播放后 devtools 才出现 m3u8/mp4 请求 |
-| WebVideoExtractor | 视频走 blob:/MSE/WebSocket,没有可拦截的 HTTP 媒体 URL | devtools Network 里只有 blob/WS,无媒体 HTTP 请求 |
-| matchVideo | 判定需要看响应体/响应头,URL 层面区分不了视频与广告 | 两类 URL 结构相同,仅内容不同 |
+| 引擎·搜索 | 搜索要用 POST / 需要动态 token / 需要登录态 | 工具 fetch 搜索 URL 拿到的不是结果页;`navigate_page` 搜索页 + `list_network_requests` 看真实搜索请求的 method 与参数 |
+| 引擎·解析 | 条目/剧集列表由 JS 动态渲染,静态 HTML 无数据 | 工具 `searchSubjects`/`searchEpisodes` 的 HTML 里搜不到条目文本,但 `take_snapshot` 的渲染 DOM 里有(引擎无 JS) |
+| 引擎·解析 | 搜索结果/剧集列表分页,目标在后面几页 | 首页 HTML 只含前 N 项加分页控件;`take_snapshot` 确认目标在翻页/加载更多之后 |
+| 引擎·selectMedia | playUrl 需要由 JS/接口计算,`<a>` 里没有 | HTML 里的 href 是 `javascript:...` 或占位符;`list_network_requests` 看点击后计算 playUrl 的接口 |
+| WebVideoExtractor | **需要用户手势(点一下播放器)才触发视频加载** | `extractVideo` 的 `diagnostics` 无媒体请求;`navigate_page` playUrl 后 `list_network_requests` 也无,`click` 播放器后再看才出现 m3u8/mp4 |
+| WebVideoExtractor | 视频走 blob:/MSE/WebSocket,没有可拦截的 HTTP 媒体 URL | `list_network_requests` 里只有 blob/WS,无媒体 HTTP 请求 |
+| matchVideo | 判定需要看响应体/响应头,URL 层面区分不了视频与广告 | 两类 URL 结构相同;`get_network_request` 看响应体/头才能区分 |
 
 ### 9.2 写进化需求文档
 
@@ -235,7 +283,8 @@ test_subject_episode_source(subjectId, episodeId,
 
 - **组件**: SelectorMediaSourceEngine / WebViewVideoExtractor(注明平台) / matchVideo / ...
 - **触发站点**: <URL>(最小复现配置与测试条目/集数见「复现材料」)
-- **现象与证据**: <工具调用序列与关键输出摘录;人工浏览器复现的观察>
+- **现象与证据**: <ani-datasource-test 的工具调用序列与关键输出摘录;
+  chrome-devtools 复现的观察——真实网络请求 / 渲染后 DOM / 点击后才出现的请求等,尽量贴具体条目>
 - **为什么现有能力做不到**: <落到具体代码与机制,例如「WebView 拦截器
   (AndroidWebMediaResolver.shouldInterceptRequest / DesktopWebMediaResolver 的
   onBeforeResourceLoad)只被动监听页面发出的请求,从不与页面交互,而该站点的
@@ -275,8 +324,9 @@ test_subject_episode_source(subjectId, episodeId,
 subagent 返回后由**主会话**闭环:
 
 1. 审阅 patch: 改动范围是否与文档一致、默认行为是否确实不变、测试是否补了;
-2. 应用 patch 到工作区,`./gradlew :tools:datasource-test-mcp:installDist` 重建并重启 server;
-3. 用触发站点重跑第 4–6 步,确认新能力真的解决了问题;
+2. 应用 patch 到工作区。**新能力改的是 App 源码,运行中的 `ani-datasource-test` server 仍是旧代码**——
+   请用户重新 `installDist` 并重启该 server(同第 0 节),使新构建生效;agent 不自行启动 server;
+3. server 重启后,用触发站点重跑第 4–6 步,确认新能力真的解决了问题;
 4. 把复测结果回填进化文档的「验收标准」下,最终把**文档 + patch + 复测证据**一起交给用户,
    是否提交由用户决定。
 
