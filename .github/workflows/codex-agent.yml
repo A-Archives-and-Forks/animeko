@@ -11,6 +11,7 @@
 #   1. Add the `ready-for-dev` label to an issue       -> the agent implements it and opens a PR.
 #   2. A maintainer submits a review on a codex PR      -> the agent addresses it and updates the PR.
 #   3. A maintainer comments `@openanibot ...` on a PR  -> the agent follows it and updates the PR.
+#      On PRs/issues AUTHORED BY openanibot, every maintainer comment triggers — no mention needed.
 #   4. A maintainer comments `@openanibot ...` on an issue -> the agent responds (answers, or
 #      implements + opens a PR), resuming the issue's Codex session when one exists.
 #      (Commit comments can't trigger: GitHub Actions no longer supports the commit_comment event.)
@@ -61,7 +62,8 @@ jobs:
       ${{ github.event.sender.type != 'Bot' && github.event.sender.login != 'openanibot' && (
             (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'ready-for-dev') ||
             (github.event_name == 'pull_request_review' && (github.event.review.state == 'changes_requested' || github.event.review.state == 'commented')) ||
-            (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openanibot'))
+            (github.event_name == 'issue_comment'
+             && (contains(github.event.comment.body, '@openanibot') || github.event.issue.user.login == 'openanibot'))
           ) }}
     runs-on: ubuntu-latest
     permissions:
