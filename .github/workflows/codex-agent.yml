@@ -8,9 +8,12 @@
 #     the `openanibot` GitHub account. The token must have read/write access to this repo.
 #
 # Triggers:
-#   1. Add the `ready-for-dev` label to an issue  -> the agent implements it and opens a PR.
-#   2. A maintainer submits a review on a codex PR -> the agent addresses it and updates the PR.
-#   3. A maintainer comments `@codex ...` on a PR  -> the agent follows it and updates the PR.
+#   1. Add the `ready-for-dev` label to an issue       -> the agent implements it and opens a PR.
+#   2. A maintainer submits a review on a codex PR      -> the agent addresses it and updates the PR.
+#   3. A maintainer comments `@openanibot ...` on a PR  -> the agent follows it and updates the PR.
+#   4. A maintainer comments `@openanibot ...` on an issue -> the agent responds (answers, or
+#      implements + opens a PR), resuming the issue's Codex session when one exists.
+#      (Commit comments can't trigger: GitHub Actions no longer supports the commit_comment event.)
 #
 # The agent does its own git + gh work (branch/commit/push/PR). The workflow only sets up the
 # environment, gates access, reacts 👀 to the trigger, hands the agent the URLs, and remembers
@@ -41,7 +44,7 @@ permissions: {}
 env:
   # Keep in sync with the literals in the job `if:` conditions below.
   READY_LABEL: ready-for-dev
-  TRIGGER_PHRASE: '@codex'
+  TRIGGER_PHRASE: '@openanibot'
   BASE_BRANCH: main
   GIT_NAME: openanibot
   GIT_EMAIL: openanibot@users.noreply.github.com
@@ -53,11 +56,12 @@ jobs:
   # actor with write access pass through.
   # ---------------------------------------------------------------------------
   authorize:
+    # sender.login guard: the bot must never trigger itself (e.g. by quoting its own mention).
     if: >-
-      ${{ github.event.sender.type != 'Bot' && (
+      ${{ github.event.sender.type != 'Bot' && github.event.sender.login != 'openanibot' && (
             (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'ready-for-dev') ||
             (github.event_name == 'pull_request_review' && (github.event.review.state == 'changes_requested' || github.event.review.state == 'commented')) ||
-            (github.event_name == 'issue_comment' && github.event.issue.pull_request != null && contains(github.event.comment.body, '@codex'))
+            (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openanibot'))
           ) }}
     runs-on: ubuntu-latest
     permissions:
@@ -207,7 +211,7 @@ jobs:
           exit "$CODEX_EXIT"
 
   # ---------------------------------------------------------------------------
-  # Review submitted OR `@codex` comment on a PR  ->  agent updates the PR.
+  # Review submitted OR `@openanibot` comment on a PR  ->  agent updates the PR.
   # ---------------------------------------------------------------------------
   iterate:
     needs: authorize
@@ -335,6 +339,131 @@ jobs:
               > "$LOG" 2>&1
           else
             echo "::warning::no remembered session for $HEAD_REF — starting fresh"
+            codex exec \
+              --dangerously-bypass-approvals-and-sandbox \
+              ${CODEX_MODEL:+--model "$CODEX_MODEL"} \
+              "$(cat "$RUNNER_TEMP/prompt.txt")" \
+              > "$LOG" 2>&1
+          fi
+          CODEX_EXIT=$?
+          set -e
+          echo "codex finished (exit $CODEX_EXIT); output kept on the runner at $LOG"
+          SESS=$(find "$SDIR" -name 'rollout-*.jsonl' -newer "$STAMP" 2>/dev/null | head -1)
+          NSID=$(basename "${SESS:-none}" .jsonl | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1 || true)
+          [ -n "${NSID:-}" ] && echo "$NSID" > "$STORE/$KEY.session"
+          exit "$CODEX_EXIT"
+
+  # ---------------------------------------------------------------------------
+  # `@openanibot` comment on a plain (non-PR) issue  ->  agent responds
+  # (answers with a comment, or implements + opens a PR). Resumes the issue's
+  # remembered Codex session so follow-ups share the conversation.
+  # (commit_comment is NOT a supported Actions trigger anymore, so commit
+  #  comments cannot be handled here — mention the bot on an issue/PR instead.)
+  # ---------------------------------------------------------------------------
+  respond:
+    needs: authorize
+    if: >-
+      ${{ needs.authorize.outputs.authorized == 'true'
+          && github.event_name == 'issue_comment'
+          && github.event.issue.pull_request == null }}
+    runs-on: [self-hosted, macOS, ARM64]
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    concurrency:
+      group: codex-agent
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.OPENANI_BOT_TOKEN }}
+      REPO: ${{ github.repository }}
+      COMMENT_ID: ${{ github.event.comment.id }}
+      COMMENT_URL: ${{ github.event.comment.html_url }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      ISSUE_URL: ${{ github.event.issue.html_url }}
+    steps:
+      - name: Set up tool PATH
+        run: |
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/ui-shots"
+          echo "ANI_UI_OUT_DIR=$RUNNER_TEMP/ui-shots" >> "$GITHUB_ENV"  # skills write screenshots here
+
+      - name: Preflight
+        run: |
+          set -euo pipefail
+          command -v codex >/dev/null || { echo "::error::codex not on PATH"; exit 1; }
+          command -v gh    >/dev/null || { echo "::error::gh not on PATH"; exit 1; }
+          test -f "${CODEX_HOME:-$HOME/.codex}/auth.json" || { echo "::error::codex not logged in"; exit 1; }
+          test -n "${GH_TOKEN:-}" || { echo "::error::OPENANI_BOT_TOKEN is not configured"; exit 1; }
+          BOT_LOGIN=$(gh api user --jq .login)
+          test "$(printf '%s' "$BOT_LOGIN" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$GIT_NAME" | tr '[:upper:]' '[:lower:]')" || {
+            echo "::error::OPENANI_BOT_TOKEN authenticates as $BOT_LOGIN, expected $GIT_NAME"
+            exit 1
+          }
+          echo "codex $(codex --version) | $(gh --version | head -1) | GitHub $BOT_LOGIN"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.OPENANI_BOT_TOKEN }}
+          persist-credentials: true
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          set -euo pipefail
+          git config user.name  "$GIT_NAME"
+          git config user.email "$GIT_EMAIL"
+
+      - name: React 👀 to the comment
+        run: |
+          gh api -X POST "repos/$REPO/issues/comments/$COMMENT_ID/reactions" -f content=eyes >/dev/null || true
+
+      - name: Build prompt
+        run: |
+          set -euo pipefail
+          {
+            echo "You are an autonomous coding agent in the Animeko repo (Kotlin Multiplatform / Compose Multiplatform)."
+            echo "A maintainer mentioned you in a comment on a GitHub issue."
+            echo "  Issue:   $ISSUE_URL"
+            echo "  Comment: $COMMENT_URL"
+            echo "Read the issue and all comments yourself with: gh issue view $ISSUE_NUMBER --comments"
+            echo
+            echo "IMPORTANT: Do every GitHub action (PRs, comments, reactions, issue/PR reads) with the 'gh' CLI only."
+            echo "Do NOT use any GitHub connector / MCP integration — 'gh' authenticates as the CI bot, a connector would act under a personal account."
+            echo "GH_TOKEN is already set from the OPENANI_BOT_TOKEN repository secret. Use that existing token; do not run 'gh auth login' or replace it."
+            echo
+            echo "Follow AGENTS.md. Do what the comment actually asks — you have full access to git and gh. Options include:"
+            echo "  - answer by commenting on the issue: gh issue comment $ISSUE_NUMBER --body ..."
+            echo "  - make code changes: use branch codex/issue-$ISSUE_NUMBER (branch off $BASE_BRANCH; reuse the branch and its PR if they"
+            echo "    already exist), push, then open or update a PR that references #$ISSUE_NUMBER."
+            echo "If your change affects any UI, verify it at runtime with the repo skills (auto-loaded from .agents/skills)"
+            echo "and embed detailed screenshots in the PR. Run android-ui-verify AND desktop-ui-verify separately if multiple platforms are affected."
+            echo "Do only what the comment actually calls for — don't over-respond — but make sure you respond in some form."
+            echo "Finish by printing a short summary."
+          } > "$RUNNER_TEMP/prompt.txt"
+
+      - name: Run Codex (resume the issue's conversation when one exists)
+        run: |
+          set -uo pipefail
+          SDIR="${CODEX_HOME:-$HOME/.codex}/sessions"
+          STORE="$HOME/.codex-agent/sessions"; mkdir -p "$STORE"
+          LOGDIR="$HOME/.codex-agent/logs"; mkdir -p "$LOGDIR"
+          KEY=$(echo "codex/issue-$ISSUE_NUMBER" | tr '/' '_')
+          LOG="$LOGDIR/${KEY}-${GITHUB_RUN_ID:-0}-${GITHUB_RUN_ATTEMPT:-1}.log"
+          SID=""; [ -f "$STORE/$KEY.session" ] && SID=$(cat "$STORE/$KEY.session")
+          STAMP="$RUNNER_TEMP/stamp"; : > "$STAMP"
+          set +e
+          # Codex output -> runner-local file, NOT the public Actions log (see implement job).
+          if [ -n "$SID" ]; then
+            codex exec resume "$SID" \
+              --dangerously-bypass-approvals-and-sandbox \
+              ${CODEX_MODEL:+--model "$CODEX_MODEL"} \
+              "$(cat "$RUNNER_TEMP/prompt.txt")" \
+              > "$LOG" 2>&1
+          else
             codex exec \
               --dangerously-bypass-approvals-and-sandbox \
               ${CODEX_MODEL:+--model "$CODEX_MODEL"} \
