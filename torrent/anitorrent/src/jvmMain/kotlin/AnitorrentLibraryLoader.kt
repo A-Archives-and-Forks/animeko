@@ -18,6 +18,7 @@ import me.him188.ani.utils.platform.currentPlatform
 import me.him188.ani.utils.platform.isAndroid
 import org.openani.anitorrent.binding.anitorrentJNI
 import java.io.IOException
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.absolutePathString
@@ -87,23 +88,15 @@ object AnitorrentLibraryLoader : TorrentLibraryLoader {
         }
     }
 
-    private fun getTempDirForPlatform(): Path {
-        return Paths.get(System.getProperty("user.dir")) // macos 也得输出到当前目录, 因为 link path 只包含一些系统路径和 .
-//        return if (platform is Platform.Windows) {
-//            Paths.get(System.getProperty("user.dir"))
-//        } else {
-//            Files.createTempDirectory("libanitorrent${Random.nextInt().absoluteValue}").apply {
-//                Runtime.getRuntime().addShutdownHook(
-//                    Thread {
-//                        try {
-//                            deleteRecursively()
-//                        } catch (e: IOException) {
-//                            logger.error(e) { "Failed to delete temp directory $this" }
-//                        }
-//                    },
-//                )
-//            }
-//        }
+    internal fun getTempDirForPlatform(
+        targetPlatform: Platform.Desktop = platform as Platform.Desktop,
+        workingDirectory: Path = Paths.get(System.getProperty("user.dir")),
+    ): Path {
+        if (targetPlatform !is Platform.MacOS) return workingDirectory
+
+        return Files.createTempDirectory("animeko-anitorrent-").apply {
+            toFile().deleteOnExit()
+        }
     }
 
 
@@ -138,6 +131,9 @@ object AnitorrentLibraryLoader : TorrentLibraryLoader {
         tempDir: Path
     ) {
         extractLibraryFromResources(name, tempDir)?.let {
+            if (platform is Platform.MacOS) {
+                it.toFile().deleteOnExit()
+            }
             System.load(it.absolutePathString())
         } ?: throw UnsatisfiedLinkError("Failed to extract library $name from resources (possibly no such resource)")
     }
